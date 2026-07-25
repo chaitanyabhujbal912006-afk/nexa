@@ -1,0 +1,14 @@
+From: sales@ourcompany.com
+To: procurement@acmecorp.com
+Date: 2024-11-03
+Subject: RE: Bulk Order Quote - Acme Corp (500 units)
+
+Hi Team,
+
+Confirming: for this bulk order of 500+ units, we can offer a 100% refund
+window of 45 days from delivery, no restocking fee, as agreed verbally
+during the vendor call. This is a special exception for Acme given the
+long-term contract we're negotiating.
+
+Best,
+Rahul (Sales)

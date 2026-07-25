@@ -1,0 +1,11 @@
+From: support@ourcompany.com
+To: client@example.com
+Date: 2024-06-15
+Subject: Refund question
+
+Hello, thanks for reaching out. Our standard refund policy allows returns
+within 30 days of delivery for a full refund, minus a 10% restocking fee
+for orders over 100 units. Let us know if you have more questions.
+
+Regards,
+Support Team

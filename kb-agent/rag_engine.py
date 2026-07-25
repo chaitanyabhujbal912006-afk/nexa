@@ -1,0 +1,193 @@
+"""
+Core RAG engine: retrieval + conflict detection + LLM generation + attribution.
+
+Swap `generate_answer()`'s LLM call for whichever provider you have a free
+API key for (see README). Everything else is provider-agnostic.
+"""
+
+import os
+import re
+from datetime import datetime
+
+import chromadb
+from sentence_transformers import SentenceTransformer
+
+BASE_DIR = os.path.dirname(__file__)
+DB_DIR = os.path.join(BASE_DIR, "chroma_db")
+
+EMBED_MODEL = "all-MiniLM-L6-v2"
+
+# Load model once at module import — keeps retrieval fast (no re-init per query).
+_model = SentenceTransformer(EMBED_MODEL)
+
+
+class RetrievalResult:
+    def __init__(self, text, metadata, distance):
+        self.text = text
+        self.metadata = metadata
+        self.distance = distance
+
+    @property
+    def date(self):
+        try:
+            return datetime.strptime(self.metadata["doc_date"], "%Y-%m-%d")
+        except (ValueError, KeyError):
+            return datetime.min
+
+    @property
+    def citation(self):
+        m = self.metadata
+        return f"{m['source_name']} ({m['source_type']}) — {m['section']}, dated {m['doc_date']}"
+
+
+def _load_collection():
+    client = chromadb.PersistentClient(path=DB_DIR)
+    return client.get_collection("sme_knowledge_base")
+
+
+def retrieve(query, top_k=5, fetch_k=12):
+    """
+    Retrieves `fetch_k` nearest chunks (wider net -- TF-IDF is a cheap
+    offline substitute for a real embedding model, so we over-fetch to
+    make sure same-topic sources from *different* documents aren't missed),
+    then keeps chunks whose topic matches the dominant topic among the
+    closest few hits, capped at top_k. This is what lets a lower-ranked
+    but topically-relevant email still surface next to the PDF section
+    that contradicts it.
+    """
+    collection = _load_collection()
+    query_vec = _model.encode([query]).tolist()
+    results = collection.query(query_embeddings=query_vec, n_results=fetch_k)
+
+    hits = []
+    for doc, meta, dist in zip(
+        results["documents"][0], results["metadatas"][0], results["distances"][0]
+    ):
+        hits.append(RetrievalResult(doc, meta, dist))
+
+    top_topics = {h.metadata.get("topic", "general") for h in hits[:2]}
+    relevant = [h for h in hits if h.metadata.get("topic", "general") in top_topics]
+    other = [h for h in hits if h not in relevant]
+
+    final = relevant[:top_k] if len(relevant) >= top_k else (relevant + other)[:top_k]
+    return final
+
+
+def detect_conflicts(hits):
+    """
+    Group retrieved chunks by topic. If more than one *source document*
+    within a topic disagrees (different source_name discussing the same
+    topic with different dated terms), flag it and pick the most recent
+    by doc_date as the trusted answer.
+    """
+    by_topic = {}
+    for h in hits:
+        topic = h.metadata.get("topic", "general")
+        by_topic.setdefault(topic, []).append(h)
+
+    def key_facts(text):
+        """Extract numeric 'facts' ($ amounts, %, day counts) AND qualitative policy terms
+        (non-refundable, no fee, all sales final, store credit) so conflict detection catches
+        both quantitative and qualitative policy contradictions."""
+        low = text.lower()
+        raw = re.findall(r"\d+%|\$\d+(?:\.\d+)?|\d+[- ]?day", low)
+        facts = {re.sub(r"[- ]", "", f) for f in raw}
+
+        qualitative_signals = [
+            "non-refundable", "non refundable", "refundable", "no fee",
+            "all sales final", "store credit", "full refund", "no refund",
+            "restocking fee waived", "returns accepted", "no returns"
+        ]
+        for sig in qualitative_signals:
+            if sig in low:
+                facts.add(sig.replace(" ", ""))
+
+        return facts
+
+    conflicts = []
+    for topic, group in by_topic.items():
+        sources = {h.metadata["source_name"] for h in group}
+        if len(sources) < 2:
+            continue
+        sorted_group = sorted(group, key=lambda h: h.date, reverse=True)
+        trusted = sorted_group[0]
+        outdated = [h for h in sorted_group[1:]
+                    if h.metadata["source_name"] != trusted.metadata["source_name"]]
+        if not outdated:
+            continue
+        trusted_facts = key_facts(trusted.text)
+        if all(key_facts(o.text) == trusted_facts for o in outdated):
+            continue  # same numbers -> not an actual conflict, just corroboration
+        conflicts.append({
+            "topic": topic,
+            "trusted": trusted,
+            "outdated": outdated,
+        })
+    return conflicts
+
+
+def build_context_block(hits, conflicts):
+    """Builds the context + conflict-awareness block fed to the LLM."""
+    lines = ["RETRIEVED SOURCES:"]
+    for i, h in enumerate(hits, 1):
+        lines.append(f"[{i}] ({h.citation})\n{h.text}")
+
+    if conflicts:
+        lines.append("\nDETECTED CONFLICTS (resolve using the most recent date):")
+        for c in conflicts:
+            lines.append(
+                f"- Topic '{c['topic']}': "
+                f"TRUST '{c['trusted'].citation}' (most recent) "
+                f"OVER {[o.citation for o in c['outdated']]}"
+            )
+    return "\n\n".join(lines)
+
+
+SYSTEM_PROMPT = """You are an internal knowledge assistant for a small business.
+Answer the employee's question using ONLY the retrieved sources below.
+Rules:
+1. Cite every factual claim with its bracket number, e.g. [1].
+2. If the sources contain a DETECTED CONFLICTS section, you MUST explicitly
+   tell the user a conflict exists, name both sources, state which one you
+   trusted and why (more recent effective/document date), and give the
+   trusted answer.
+3. If the retrieved sources don't answer the question, say so plainly —
+   never invent an answer.
+4. Be concise and specific (numbers, dates, dollar amounts, policy terms).
+"""
+
+
+def generate_answer(query, hits, conflicts, llm_call_fn=None):
+    """
+    llm_call_fn: a function (system_prompt, user_prompt) -> str.
+    If not provided, falls back to a rule-based mock so the app is fully
+    demoable with zero API keys and zero cost.
+    """
+    context_block = build_context_block(hits, conflicts)
+    user_prompt = f"QUESTION: {query}\n\n{context_block}"
+
+    if llm_call_fn is not None:
+        return llm_call_fn(SYSTEM_PROMPT, user_prompt), context_block
+
+    # ---- Zero-cost fallback: deterministic mock reasoning ----
+    # This lets you demo the full pipeline before wiring up any paid/free
+    # LLM API key. Replace by passing a real llm_call_fn (see app.py).
+    if conflicts:
+        c = conflicts[0]
+        answer = (
+            f"⚠️ Conflict detected on **{c['topic']}**.\n\n"
+            f"- Older source: {c['outdated'][0].citation} says: "
+            f"\"{c['outdated'][0].text[:180]}...\"\n"
+            f"- Newer source: {c['trusted'].citation} says: "
+            f"\"{c['trusted'].text[:180]}...\"\n\n"
+            f"**Trusted answer** (most recent, dated {c['trusted'].date.date()}): "
+            f"{c['trusted'].text}\n\n"
+            f"Reasoning: the newer document explicitly states it supersedes "
+            f"prior terms, and its effective date is later, so it takes "
+            f"precedence over the older email."
+        )
+    elif hits:
+        answer = f"Based on [1] {hits[0].citation}: {hits[0].text}"
+    else:
+        answer = "I couldn't find anything in the knowledge base to answer that."
+    return answer, context_block

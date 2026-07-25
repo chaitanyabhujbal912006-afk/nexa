@@ -1,0 +1,13 @@
+# Streamlit secrets — NEVER commit API keys!
+.streamlit/secrets.toml
+
+# Local databases and vector stores
+chroma_db/
+*.sqlite3
+
+# Python bytecode and environment
+__pycache__/
+*.pyc
+
+# Audit logs
+audit_log.jsonl

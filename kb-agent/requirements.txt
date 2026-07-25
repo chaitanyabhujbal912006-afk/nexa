@@ -1,0 +1,8 @@
+streamlit
+chromadb
+pypdf
+openpyxl
+pandas
+sentence-transformers
+fpdf2
+requests
