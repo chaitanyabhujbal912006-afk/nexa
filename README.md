@@ -8,6 +8,38 @@ Nexa is an enterprise-grade, conflict-aware RAG (Retrieval-Augmented Generation)
 
 ---
 
+## 🏢 Real-World Use Case & Scenario
+
+### The Problem in SME Operations
+A customer support representative receives a call from a key client (**Acme Corp**) demanding a full refund and 45-day payment terms based on an old sales email from November. Unbeknownst to the representative, operations issued an updated company policy PDF in December (15-day refund window, 10% restocking fee). 
+
+Searching across scattered emails, pricing sheets, and PDF folders manually leads to inconsistent answers, lost revenue, or customer disputes.
+
+### How Nexa Solves It in Seconds
+
+1. **Natural Question:** The representative asks:  
+   > *"What is our refund policy and payment terms for bulk orders quoted to Acme Corp?"*
+
+2. **Conflict Resolution Output:** Nexa searches across all document formats, compares dates, detects contradictions, and outputs:
+   ```markdown
+   ⚠️ Conflict Detected on bulk_refund_policy:
+   • Superseded Source: email_2024-11-03_acme_refund.txt (Nov 3, 2024) — promised 45-day return window & $0 fee.
+   • Trusted Source (Most Recent): refund_policy_v2.1.pdf (Dec 1, 2024) — effective Dec 1, 2024.
+
+   Trusted Answer:
+   For bulk orders, returns must be initiated within 15 days of delivery [1]. A 10% restocking fee
+   applies to all processed returns [1]. The December policy PDF explicitly states that its terms
+   supersede all previous email quotes issued prior to Dec 1, 2024 [1].
+
+   Citations Used:
+   📄 refund_policy_v2.1.pdf (pdf) — Section 4: Bulk Order Refunds, dated 2024-12-01
+   ✉️ email_2024-11-03_acme_refund.txt (email) — chunk 1, dated 2024-11-03
+   ```
+
+3. **Instant Ticket Creation:** The representative clicks **"Create CRM Ticket ➜"** to generate an audit-logged support ticket ready for client response.
+
+---
+
 ## 🌟 Key Features
 
 - **📄 Multi-Format Document Ingestion:** Native support for PDFs (with OCR fallback for scanned images), multi-sheet `.xlsx` workbooks (row-to-sentence conversion), `.txt`, and raw `.eml` email files.
@@ -16,6 +48,20 @@ Nexa is an enterprise-grade, conflict-aware RAG (Retrieval-Augmented Generation)
 - **⚖️ Quantitative & Qualitative Conflict Resolution:** Detects both numeric disagreements ($ amounts, %, day counts) AND qualitative policy terms (*"non-refundable"*, *"all sales final"*, *"no fee"*).
 - **🎫 CRM Ticket Studio:** Integrated workspace for auto-populating support response tickets directly from cited answers.
 - **🛡️ Audit Trail & Feedback System:** Persistent logging to `data/audit_log.jsonl` with interactive Q&A history analytics and one-click answer flagging.
+
+---
+
+## 📱 Mobile App & On-the-Go Access
+
+Nexa is **100% mobile-responsive** out of the box for smartphones and tablets:
+
+### Option A: Progressive Web App (PWA) / Mobile Web (Zero Setup)
+1. Open the deployed Nexa URL (e.g., `https://nexa.streamlit.app`) on Safari (iOS) or Chrome (Android).
+2. Tap **Share → "Add to Home Screen"**.
+3. **Nexa launches as a native full-screen mobile application** directly from your phone's home screen!
+
+### Option B: Native Mobile App API Integration
+Nexa's `rag_engine.py` can be mounted behind a lightweight **FastAPI backend**, allowing native **Flutter** or **React Native** iOS/Android apps to tap into Nexa for mobile camera document scanning (OCR on paper contracts) and voice assistant queries.
 
 ---
 
