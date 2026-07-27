@@ -358,24 +358,72 @@ code, pre, .mono {
 }
 
 /* ─── CHAT INPUT ─── */
-[data-testid="stChatInput"] textarea {
-    background: rgba(124,58,237,0.06) !important;
-    border: 1px solid rgba(124,58,237,0.3) !important;
+[data-testid="stChatInput"] {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+}
+[data-testid="stChatInput"] > div {
+    background: rgba(20, 10, 35, 0.85) !important;
+    border: 1px solid rgba(124, 58, 237, 0.4) !important;
     border-radius: 16px !important;
+    backdrop-filter: blur(12px) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 15px rgba(124, 58, 237, 0.15) !important;
+    overflow: hidden !important;
+}
+[data-testid="stChatInput"] textarea {
+    background: transparent !important;
+    border: none !important;
     color: #e2d9f3 !important;
     font-family: 'Inter', sans-serif !important;
     font-size: 0.92rem !important;
-    transition: all 0.2s !important;
+    padding: 12px 16px !important;
+    box-shadow: none !important;
 }
 [data-testid="stChatInput"] textarea:focus {
-    border-color: rgba(167,139,250,0.7) !important;
-    box-shadow: 0 0 0 3px rgba(124,58,237,0.15), 0 0 30px rgba(124,58,237,0.1) !important;
-    background: rgba(124,58,237,0.1) !important;
+    box-shadow: none !important;
+    background: transparent !important;
 }
 [data-testid="stChatInput"] button {
     background: linear-gradient(135deg, #7c3aed, #ec4899) !important;
     border-radius: 10px !important;
     border: none !important;
+    color: #ffffff !important;
+    margin-right: 6px !important;
+}
+
+/* ─── FILE UPLOADER FIXES ─── */
+[data-testid="stFileUploader"] {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+}
+[data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] {
+    background: rgba(124, 58, 237, 0.05) !important;
+    border: 1px dashed rgba(124, 58, 237, 0.35) !important;
+    border-radius: 12px !important;
+    padding: 12px !important;
+    color: #c4b5fd !important;
+}
+[data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] * {
+    background: transparent !important;
+    color: #c4b5fd !important;
+}
+[data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] button {
+    background: rgba(124, 58, 237, 0.2) !important;
+    border: 1px solid rgba(167, 139, 250, 0.4) !important;
+    border-radius: 8px !important;
+    color: #e2d9f3 !important;
+    padding: 6px 12px !important;
+    font-size: 0.78rem !important;
+}
+[data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] button:hover {
+    background: rgba(124, 58, 237, 0.35) !important;
+    color: #ffffff !important;
+}
+[data-testid="stFileUploader"] small {
+    color: #8b5cf6 !important;
+    font-size: 0.7rem !important;
 }
 
 /* ─── CHAT MESSAGES ─── */
@@ -616,13 +664,6 @@ label, [data-testid="stWidgetLabel"] {
     letter-spacing: 0.08em !important;
 }
 
-/* ─── FILE UPLOADER ─── */
-[data-testid="stFileUploader"] {
-    background: rgba(124,58,237,0.05) !important;
-    border: 1px dashed rgba(124,58,237,0.3) !important;
-    border-radius: 12px !important;
-}
-
 /* ─── DIVIDER ─── */
 hr { border-color: rgba(124,58,237,0.15) !important; }
 
@@ -668,6 +709,57 @@ hr { border-color: rgba(124,58,237,0.15) !important; }
 
 /* ─── CODE BLOCK ─── */
 pre, code {
+    background: rgba(0,0,0,0.4) !important;
+    border: 1px solid rgba(124,58,237,0.2) !important;
+    border-radius: 8px !important;
+    color: #c4b5fd !important;
+    font-family: 'JetBrains Mono', monospace !important;
+}
+
+/* ─── SCAN LINE OVERLAY ─── */
+body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(0,0,0,0.04) 3px,
+        rgba(0,0,0,0.04) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+}
+
+/* ─── CAPTION ─── */
+.stCaption, [data-testid="stCaptionContainer"] {
+    color: #475569 !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 0.72rem !important;
+}
+
+/* ─── SUGGESTED QUESTIONS LABEL ─── */
+.nx-section-label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: #4b5563;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.nx-section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(124,58,237,0.3), transparent);
+}
+
     background: rgba(0,0,0,0.4) !important;
     border: 1px solid rgba(124,58,237,0.2) !important;
     border-radius: 8px !important;
