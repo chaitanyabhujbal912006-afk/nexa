@@ -1,121 +1,202 @@
 # ⚡ Nexa — SME Knowledge Retrieval Agent
 
-Nexa is an enterprise-grade, conflict-aware RAG (Retrieval-Augmented Generation) agent designed for SMEs. It unifies scattered business knowledge across PDFs, multi-sheet Excel spreadsheets, `.txt`, and raw `.eml` emails into one cited conversational assistant.
+> Enterprise-grade, conflict-aware RAG agent for small & medium businesses.
+> Unifies scattered knowledge across PDFs, Excel workbooks, and emails into one cited, AI-powered conversational assistant.
 
-![Nexa Banner](https://img.shields.io/badge/Nexa-v2.0-indigo?style=for-the-badge&logo=lightning)
-![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
-![LLM Support](https://img.shields.io/badge/LLM-Groq%20%7C%20Gemini-emerald?style=for-the-badge)
-
----
-
-## 🏢 Real-World Use Case & Scenario
-
-### The Problem in SME Operations
-A customer support representative receives a call from a key client (**Acme Corp**) demanding a full refund and 45-day payment terms based on an old sales email from November. Unbeknownst to the representative, operations issued an updated company policy PDF in December (15-day refund window, 10% restocking fee). 
-
-Searching across scattered emails, pricing sheets, and PDF folders manually leads to inconsistent answers, lost revenue, or customer disputes.
-
-### How Nexa Solves It in Seconds
-
-1. **Natural Question:** The representative asks:  
-   > *"What is our refund policy and payment terms for bulk orders quoted to Acme Corp?"*
-
-2. **Conflict Resolution Output:** Nexa searches across all document formats, compares dates, detects contradictions, and outputs:
-   ```markdown
-   ⚠️ Conflict Detected on bulk_refund_policy:
-   • Superseded Source: email_2024-11-03_acme_refund.txt (Nov 3, 2024) — promised 45-day return window & $0 fee.
-   • Trusted Source (Most Recent): refund_policy_v2.1.pdf (Dec 1, 2024) — effective Dec 1, 2024.
-
-   Trusted Answer:
-   For bulk orders, returns must be initiated within 15 days of delivery [1]. A 10% restocking fee
-   applies to all processed returns [1]. The December policy PDF explicitly states that its terms
-   supersede all previous email quotes issued prior to Dec 1, 2024 [1].
-
-   Citations Used:
-   📄 refund_policy_v2.1.pdf (pdf) — Section 4: Bulk Order Refunds, dated 2024-12-01
-   ✉️ email_2024-11-03_acme_refund.txt (email) — chunk 1, dated 2024-11-03
-   ```
-
-3. **Instant Ticket Creation:** The representative clicks **"Create CRM Ticket ➜"** to generate an audit-logged support ticket ready for client response.
+![Nexa](https://img.shields.io/badge/Nexa-v2.0-7c3aed?style=for-the-badge&logo=lightning)
+![License](https://img.shields.io/badge/License-MIT-6366f1?style=for-the-badge)
+![LLM](https://img.shields.io/badge/LLM-Groq%20%7C%20Gemini-ec4899?style=for-the-badge)
+![Tests](https://img.shields.io/badge/Tests-8%20Passed-34d399?style=for-the-badge)
+![CI](https://img.shields.io/github/actions/workflow/status/chaitanyabhujbal912006-afk/nexa/ci.yml?style=for-the-badge&label=CI)
 
 ---
 
-## 🌟 Key Features
+## 🏢 The Problem It Solves
 
-- **📄 Multi-Format Document Ingestion:** Native support for PDFs (with OCR fallback for scanned images), multi-sheet `.xlsx` workbooks (row-to-sentence conversion), `.txt`, and raw `.eml` email files.
-- **🧠 Dense Semantic Search:** Powered by `sentence-transformers/all-MiniLM-L6-v2` (384-dim) vector embeddings stored in a local ChromaDB index.
-- **📅 Dynamic Date & Conflict Engine:** Standardizes document dates from email headers, PDF metadata, and document text. Automatically flags policy contradictions between older and newer sources, trusting the latest date.
-- **⚖️ Quantitative & Qualitative Conflict Resolution:** Detects both numeric disagreements ($ amounts, %, day counts) AND qualitative policy terms (*"non-refundable"*, *"all sales final"*, *"no fee"*).
-- **🎫 CRM Ticket Studio:** Integrated workspace for auto-populating support response tickets directly from cited answers.
-- **🛡️ Audit Trail & Feedback System:** Persistent logging to `data/audit_log.jsonl` with interactive Q&A history analytics and one-click answer flagging.
+A customer support rep gets a call from **Acme Corp** demanding a refund based on an old email from November. But the company issued an updated policy PDF in December. Searching manually leads to inconsistent answers, disputes, and lost revenue.
+
+**Nexa solves this in seconds:**
+
+> *"What is our refund policy for bulk orders quoted to Acme Corp?"*
+
+```
+⚠️ Conflict Detected on bulk_refund_policy:
+  SUPERSEDED  email_2024-11-03_acme_refund.txt — promised 45-day return, $0 fee
+  TRUSTED     refund_policy_v2.1.pdf (Dec 1, 2024) — 15-day return, 10% fee
+
+Trusted Answer:
+Returns for bulk orders must be initiated within 15 days [1].
+A 10% restocking fee applies [1]. The December policy supersedes
+all prior email quotes issued before Dec 1, 2024 [1].
+
+Citations:
+📄 refund_policy_v2.1.pdf — Section 4, dated 2024-12-01
+✉️ email_2024-11-03_acme_refund.txt — chunk 1, dated 2024-11-03
+```
 
 ---
 
-## 📱 Mobile App & On-the-Go Access
+## 🌟 Features
 
-Nexa is **100% mobile-responsive** out of the box for smartphones and tablets:
-
-### Option A: Progressive Web App (PWA) / Mobile Web (Zero Setup)
-1. Open the deployed Nexa URL (e.g., `https://nexa.streamlit.app`) on Safari (iOS) or Chrome (Android).
-2. Tap **Share → "Add to Home Screen"**.
-3. **Nexa launches as a native full-screen mobile application** directly from your phone's home screen!
-
-### Option B: Native Mobile App API Integration
-Nexa's `rag_engine.py` can be mounted behind a lightweight **FastAPI backend**, allowing native **Flutter** or **React Native** iOS/Android apps to tap into Nexa for mobile camera document scanning (OCR on paper contracts) and voice assistant queries.
+| Feature | Detail |
+|---|---|
+| **Multi-Format Ingestion** | PDF (+ OCR fallback), multi-sheet `.xlsx`, `.txt`, `.eml` |
+| **Semantic Vector Search** | `all-MiniLM-L6-v2` (384-dim) via ChromaDB |
+| **Conflict Detection Engine** | Detects numeric AND qualitative policy contradictions, trusts latest date |
+| **Dual LLM Support** | Gemini Flash (primary) → Groq llama-3.3-70b (secondary) → Demo mode |
+| **Cyberpunk UI** | Dark neon Streamlit app with Orbitron/JetBrains Mono typography |
+| **CRM Ticket Studio** | Auto-populate support tickets from cited answers |
+| **FastAPI REST Backend** | `/api/v1/query`, `/api/v1/health`, `/api/v1/ingest` |
+| **Audit Trail** | Persistent JSONL logging of every Q&A turn |
+| **Pytest Test Suite** | 8 tests covering date extraction, conflict detection, and context building |
+| **Docker Ready** | `Dockerfile` + `docker-compose.yml` for one-command deployment |
+| **GitHub Actions CI** | Auto-runs tests on every `git push` |
 
 ---
 
-## 🏗️ Architecture Overview
+## 🏗️ Architecture
 
 ```
 data/pdf_src/*.pdf   ─┐
-data/*.xlsx          ─┼─► ingest.py ──► SentenceTransformers (384-dim) ──► ChromaDB
-data/emails/*.eml    ─┘        (source, doc_date, section, dynamic_topic)
-                                                 │
-Question ──► app.py ──► rag_engine.retrieve() ──► rag_engine.detect_conflicts()
-                                                 │
-                                     call_llm() (Groq / Gemini) ──► Cited Answer + Audit Log
+data/*.xlsx          ─┼─► ingest.py ──► SentenceTransformers ──► ChromaDB
+data/emails/*.eml    ─┘         (topic, doc_date, section, source_type)
+                                              │
+Question ──► app.py (Streamlit UI)            │
+          ──► api.py (FastAPI REST)  ──► rag_engine.retrieve()
+                                          ──► detect_conflicts()
+                                          ──► generate_answer()
+                                              │
+                               Gemini Flash / Groq ──► Cited Answer + Audit Log
 ```
 
 ---
 
-## 🚀 Quickstart (Local Development)
+## 📁 Project Structure
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/chaitanyabhujbal912006-afk/nexa.git
-   cd nexa/kb-agent
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Configure API Key (Free Tier):**
-   Create a `.streamlit/secrets.toml` file inside `kb-agent/`:
-   ```toml
-   GROQ_API_KEY = "gsk_your_groq_api_key_here"
-   ```
-
-4. **Run ingestion & start the app:**
-   ```bash
-   python ingest.py
-   streamlit run app.py
-   ```
+```
+nexa/
+├── kb-agent/
+│   ├── app.py                  # Streamlit UI — Copilot, CRM Studio, Analytics
+│   ├── api.py                  # FastAPI REST server
+│   ├── rag_engine.py           # Retrieval, conflict detection, LLM dispatch
+│   ├── ingest.py               # Multi-format document ingestion pipeline
+│   ├── audit.py                # JSONL audit logger
+│   ├── generate_sample_pdfs.py # Sample PDF generator for demo
+│   ├── Dockerfile              # Container definition
+│   ├── requirements.txt
+│   ├── data/
+│   │   ├── pdf_src/            # PDF documents
+│   │   ├── emails/             # .txt and .eml email files
+│   │   └── *.xlsx              # Excel spreadsheets
+│   ├── tests/
+│   │   ├── test_ingest_dates.py
+│   │   └── test_rag_engine.py
+│   └── .streamlit/
+│       ├── config.toml
+│       └── secrets.toml        # API keys (gitignored)
+├── docker-compose.yml
+├── .github/
+│   └── workflows/
+│       └── ci.yml              # GitHub Actions CI pipeline
+└── LICENSE
+```
 
 ---
 
-## ☁️ Streamlit Cloud Deployment (100% Free)
+## 🚀 Quickstart (Local)
 
-1. Push your changes to GitHub.
-2. Go to **[share.streamlit.io](https://share.streamlit.io)** → **New App**.
-3. Select repo `chaitanyabhujbal912006-afk/nexa` and set Main file path to `kb-agent/app.py`.
-4. Add your `GROQ_API_KEY` under **Settings → Secrets**.
-5. Click **Deploy**!
+### 1. Clone & install
+
+```bash
+git clone https://github.com/chaitanyabhujbal912006-afk/nexa.git
+cd nexa/kb-agent
+pip install -r requirements.txt
+```
+
+### 2. Configure API key
+
+Create `.streamlit/secrets.toml`:
+
+```toml
+# Groq (free tier) — https://console.groq.com/keys
+GROQ_API_KEY = "gsk_your_groq_key_here"
+
+# Optional: Gemini Flash takes priority when set
+# GEMINI_API_KEY = "AIza_your_gemini_key_here"
+```
+
+### 3. Ingest documents & run
+
+```bash
+python ingest.py
+streamlit run app.py
+```
+
+App available at **http://localhost:8501**
+
+---
+
+## 🐳 Docker Deployment
+
+```bash
+# Set your keys in environment
+$env:GROQ_API_KEY = "gsk_your_key"
+
+# Build & start both UI + API containers
+docker-compose up --build
+```
+
+| Service | URL |
+|---|---|
+| Streamlit UI | http://localhost:8501 |
+| FastAPI REST | http://localhost:8000 |
+| API Docs | http://localhost:8000/docs |
+
+---
+
+## ⚡ REST API
+
+```bash
+# Health check
+GET /api/v1/health
+
+# Query the knowledge base
+POST /api/v1/query
+{
+  "query": "What is our refund policy for Acme Corp?",
+  "top_k": 5
+}
+
+# Trigger re-ingestion
+POST /api/v1/ingest
+```
+
+Full interactive API docs at **http://localhost:8000/docs** (Swagger UI auto-generated by FastAPI).
+
+---
+
+## 🧪 Tests
+
+```bash
+cd kb-agent
+pytest tests/
+# 8 passed ✅
+```
+
+CI runs automatically on every `git push` via GitHub Actions.
+
+---
+
+## ☁️ Streamlit Cloud Deployment (Free)
+
+1. Push to GitHub.
+2. Go to [share.streamlit.io](https://share.streamlit.io) → **New App**.
+3. Set Main file path: `kb-agent/app.py`
+4. Add `GROQ_API_KEY` under **Settings → Secrets**.
+5. Click **Deploy** — live in ~2 minutes!
 
 ---
 
 ## 📜 License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the MIT License. See [LICENSE](LICENSE) for details.
