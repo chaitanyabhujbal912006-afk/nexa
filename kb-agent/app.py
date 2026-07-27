@@ -640,20 +640,55 @@ code, pre, .mono {
     font-family: 'JetBrains Mono', monospace !important;
 }
 
-/* ─── INPUTS ─── */
-[data-testid="stTextInput"] input,
-[data-testid="stTextArea"] textarea,
-[data-testid="stSelectbox"] select {
-    background: rgba(124,58,237,0.06) !important;
-    border: 1px solid rgba(124,58,237,0.25) !important;
-    border-radius: 10px !important;
+/* ─── BASEWEB INPUT & SELECT FIX (DARK GLASSMORPHISM) ─── */
+[data-baseweb="input"],
+[data-baseweb="base-input"],
+[data-baseweb="select"] > div,
+div[data-baseweb="select"] {
+    background-color: rgba(18, 8, 38, 0.85) !important;
+    border: 1px solid rgba(124, 58, 237, 0.35) !important;
+    border-radius: 12px !important;
     color: #e2d9f3 !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3) !important;
+    transition: all 0.25s ease !important;
+}
+
+[data-baseweb="input"]:focus-within,
+[data-baseweb="base-input"]:focus-within,
+[data-baseweb="select"] > div:focus-within {
+    border-color: rgba(167, 139, 250, 0.7) !important;
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2), 0 0 20px rgba(124, 58, 237, 0.25) !important;
+    background-color: rgba(25, 12, 50, 0.95) !important;
+}
+
+[data-testid="stTextInput"] input,
+[data-testid="stTextArea"] textarea {
+    background-color: transparent !important;
+    color: #f1f5f9 !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.92rem !important;
+}
+
+/* Selectbox Dropdown Menu Options */
+[data-baseweb="popover"],
+[data-baseweb="menu"],
+ul[data-baseweb="menu"] {
+    background-color: #0f051d !important;
+    border: 1px solid rgba(124, 58, 237, 0.4) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8) !important;
+}
+
+li[data-baseweb="option"] {
+    background-color: transparent !important;
+    color: #cbd5e1 !important;
     font-family: 'Inter', sans-serif !important;
 }
-[data-testid="stTextInput"] input:focus,
-[data-testid="stTextArea"] textarea:focus {
-    border-color: rgba(167,139,250,0.6) !important;
-    box-shadow: 0 0 0 2px rgba(124,58,237,0.15) !important;
+
+li[data-baseweb="option"]:hover,
+li[data-baseweb="option"][aria-selected="true"] {
+    background-color: rgba(124, 58, 237, 0.3) !important;
+    color: #a78bfa !important;
 }
 
 label, [data-testid="stWidgetLabel"] {
@@ -662,6 +697,39 @@ label, [data-testid="stWidgetLabel"] {
     font-family: 'JetBrains Mono', monospace !important;
     text-transform: uppercase !important;
     letter-spacing: 0.08em !important;
+}
+
+/* ─── RESPONSIVE WOW DESIGN (MOBILE & TABLET) ─── */
+@media (max-width: 768px) {
+    .nx-hero {
+        padding: 24px 20px !important;
+        border-radius: 16px !important;
+    }
+    .nx-hero h1 {
+        font-size: 1.8rem !important;
+    }
+    .nx-hero p {
+        font-size: 0.85rem !important;
+    }
+    .bento-grid {
+        grid-template-columns: 1fr !important;
+        gap: 8px !important;
+    }
+    [data-testid="column"] {
+        width: 100% !important;
+        margin-bottom: 12px !important;
+    }
+    .nx-answer {
+        padding: 16px 18px !important;
+        font-size: 0.88rem !important;
+    }
+    .nx-conflict {
+        padding: 14px 16px !important;
+    }
+    [data-testid="stTabs"] button {
+        padding: 8px 12px !important;
+        font-size: 0.65rem !important;
+    }
 }
 
 /* ─── DIVIDER ─── */
