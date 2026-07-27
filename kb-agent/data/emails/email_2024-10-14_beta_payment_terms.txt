@@ -1,0 +1,25 @@
+From: sales@yourcompany.com
+To: procurement@betallc.com
+Subject: Re: Payment Terms for Q3 Order — Beta LLC
+Date: Mon, 14 Oct 2024 10:22:00 +0000
+
+Hi Sarah,
+
+Thank you for reaching out regarding your Q3 bulk order.
+
+As discussed on our call, we are pleased to offer Beta LLC the following
+standard payment terms for orders above $10,000:
+
+- Net 30 payment terms from invoice date
+- 2% early payment discount if settled within 10 days
+- No interest charged on balances paid within 30 days
+
+For your order of 500 units of Product SKU-A200 at $24.50/unit (total $12,250),
+the invoice will be issued upon shipment confirmation.
+
+Please note these terms are subject to credit approval and may be revised
+in our updated vendor agreements issued each January.
+
+Best regards,
+James Whitfield
+Regional Sales Manager

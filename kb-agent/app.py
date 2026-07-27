@@ -1,4 +1,5 @@
 import os
+import glob
 from datetime import datetime
 
 import streamlit as st
@@ -242,13 +243,13 @@ with st.sidebar:
 
             st.success(f"Saved {fname}! Re-indexing knowledge base...")
             import subprocess
-            subprocess.run(["python3", "ingest.py"], cwd=os.path.dirname(__file__))
+            subprocess.run(["python", "ingest.py"], cwd=os.path.dirname(__file__))
             st.success("Re-ingestion complete!")
             st.rerun()
 
     if st.button("🔄 Re-run Full Ingestion", use_container_width=True):
         import subprocess
-        subprocess.run(["python3", "ingest.py"], cwd=os.path.dirname(__file__))
+        subprocess.run(["python", "ingest.py"], cwd=os.path.dirname(__file__))
         st.success("Re-ingested all source files.")
 
 # ---------------------------------------------------------------------------

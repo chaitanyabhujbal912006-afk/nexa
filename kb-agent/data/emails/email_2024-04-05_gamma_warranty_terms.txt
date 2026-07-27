@@ -1,0 +1,25 @@
+From: support@yourcompany.com
+To: contact@gammaindustries.com
+Subject: Warranty & Support Policy Confirmation — Gamma Industries
+Date: Fri, 05 Apr 2024 14:35:00 +0000
+
+Dear Gamma Industries Team,
+
+Following our sales call, here is a summary of the warranty and support
+terms for your account:
+
+PRODUCT WARRANTY:
+- All hardware products carry a 12-month manufacturer warranty from date of delivery.
+- Warranty covers defects in materials and workmanship under normal use.
+- Accidental damage and wear-and-tear are excluded.
+
+SUPPORT:
+- Business hours support (Mon–Fri, 9am–6pm) via email and phone at no charge.
+- Priority 24/7 support available for an additional $299/month per account.
+- Average response time for standard tickets: 4 business hours.
+
+These terms are valid for purchases made in 2024. Warranty terms are
+reviewed annually and may be updated in our published Support Policy PDF.
+
+Kind regards,
+Customer Success Team
