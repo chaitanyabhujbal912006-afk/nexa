@@ -42,7 +42,7 @@ class RetrievalResult:
 
 def _load_collection():
     client = chromadb.PersistentClient(path=DB_DIR)
-    return client.get_collection("sme_knowledge_base")
+    return client.get_or_create_collection(name="sme_knowledge_base", metadata={"hnsw:space": "cosine"})
 
 
 def retrieve(query, top_k=5, fetch_k=12):

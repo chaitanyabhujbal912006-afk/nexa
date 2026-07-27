@@ -29,6 +29,12 @@ jobs:
         python -c "import ast; ast.parse(open('kb-agent/rag_engine.py').read()); print('rag_engine.py OK')"
         python -c "import ast; ast.parse(open('kb-agent/api.py').read()); print('api.py OK')"
 
+    - name: Run Ingestion Pipeline
+      run: |
+        cd kb-agent
+        python generate_sample_pdfs.py
+        python ingest.py
+
     - name: Run Test Suite
       run: |
         cd kb-agent
