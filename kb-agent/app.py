@@ -116,8 +116,13 @@ html, body, [data-testid="stAppViewContainer"] {
 [data-testid="stSidebarNav"] { display: none !important; }
 
 /* ─── GLOBAL FONT ─── */
-html, body, [class*="css"], .stMarkdown, p, span, div {
+html, body, [class*="css"], .stMarkdown {
     font-family: 'Inter', sans-serif !important;
+    color: #e2d9f3 !important;
+}
+/* Explicitly reset fill-color so .nx-hero h1 gradient doesn't bleed into children */
+body * {
+    -webkit-text-fill-color: unset;
 }
 h1, h2, h3, h4, h5 {
     font-family: 'Orbitron', sans-serif !important;
@@ -326,11 +331,12 @@ code, pre, .mono {
     background: rgba(124,58,237,0.05) !important;
 }
 
-/* ─── EXAMPLE BUTTONS ─── */
+/* ─── BUTTONS ─── */
 [data-testid="stButton"] > button {
     background: rgba(124,58,237,0.1) !important;
     border: 1px solid rgba(124,58,237,0.35) !important;
     color: #c4b5fd !important;
+    -webkit-text-fill-color: #c4b5fd !important;
     border-radius: 12px !important;
     font-family: 'Inter', sans-serif !important;
     font-size: 0.82rem !important;
@@ -343,16 +349,21 @@ code, pre, .mono {
     background: rgba(124,58,237,0.25) !important;
     border-color: rgba(167,139,250,0.6) !important;
     color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
     box-shadow: 0 0 20px rgba(124,58,237,0.3) !important;
     transform: translateY(-1px) !important;
 }
-[data-testid="stButton"] > button[kind="primary"] {
+/* Primary buttons (sidebar Save & Ingest, CRM Create) */
+[data-testid="stButton"] > button[kind="primary"],
+[data-testid="stButton"] > button[data-testid="baseButton-primary"] {
     background: linear-gradient(135deg, #7c3aed, #6366f1) !important;
     border: none !important;
     color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
     box-shadow: 0 4px 20px rgba(124,58,237,0.4) !important;
 }
-[data-testid="stButton"] > button[kind="primary"]:hover {
+[data-testid="stButton"] > button[kind="primary"]:hover,
+[data-testid="stButton"] > button[data-testid="baseButton-primary"]:hover {
     box-shadow: 0 6px 30px rgba(124,58,237,0.6) !important;
     transform: translateY(-2px) !important;
 }
@@ -444,12 +455,23 @@ code, pre, .mono {
 [data-testid="stChatMessage"] {
     background: transparent !important;
     border: none !important;
+    color: #e2d9f3 !important;
+    -webkit-text-fill-color: #e2d9f3 !important;
 }
-[data-testid="stChatMessage"][data-testid*="user"] {
+/* User messages: target by aria-label role */
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
     background: rgba(124,58,237,0.07) !important;
     border: 1px solid rgba(124,58,237,0.2) !important;
     border-radius: 16px !important;
+    padding: 12px 16px !important;
     margin: 8px 0 !important;
+}
+/* Ensure all chat text is visible */
+[data-testid="stChatMessage"] p,
+[data-testid="stChatMessage"] span,
+[data-testid="stChatMessage"] div {
+    color: #e2d9f3 !important;
+    -webkit-text-fill-color: #e2d9f3 !important;
 }
 
 /* ─── CONFLICT BOX ─── */
@@ -705,8 +727,11 @@ li[data-baseweb="option"][aria-selected="true"] {
     color: #a78bfa !important;
 }
 
-label, [data-testid="stWidgetLabel"] {
+/* Widget labels - scoped to avoid overriding general text */
+[data-testid="stWidgetLabel"] > p,
+[data-testid="stWidgetLabel"] label {
     color: #94a3b8 !important;
+    -webkit-text-fill-color: #94a3b8 !important;
     font-size: 0.78rem !important;
     font-family: 'JetBrains Mono', monospace !important;
     text-transform: uppercase !important;
@@ -1023,7 +1048,7 @@ with tab_copilot:
                 "hits": [{"text": h.text, "citation": h.citation} for h in hits],
                 "conflicts": [{"topic": c["topic"], "trusted": c["trusted"].citation} for c in conflicts],
             }
-            st.rerun()
+            # Do NOT st.rerun() here — it would erase the answer before the user reads it
 
 # ─── TAB 2: CRM ───
 with tab_crm:
