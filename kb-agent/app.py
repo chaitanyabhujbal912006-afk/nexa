@@ -828,55 +828,12 @@ body::after {
     background: linear-gradient(90deg, rgba(124,58,237,0.3), transparent);
 }
 
-    background: rgba(0,0,0,0.4) !important;
-    border: 1px solid rgba(124,58,237,0.2) !important;
-    border-radius: 8px !important;
-    color: #c4b5fd !important;
-    font-family: 'JetBrains Mono', monospace !important;
+/* ─── FILE UPLOADER BUTTON HIDE LABEL DUPLICATION ─── */
+[data-testid="stFileUploaderDropzone"] span {
+    display: none !important;
 }
-
-/* ─── SCAN LINE OVERLAY ─── */
-body::after {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background: repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 3px,
-        rgba(0,0,0,0.04) 3px,
-        rgba(0,0,0,0.04) 4px
-    );
-    pointer-events: none;
-    z-index: 9999;
-}
-
-/* ─── CAPTION ─── */
-.stCaption, [data-testid="stCaptionContainer"] {
-    color: #475569 !important;
-    font-family: 'JetBrains Mono', monospace !important;
-    font-size: 0.72rem !important;
-}
-
-/* ─── SUGGESTED QUESTIONS LABEL ─── */
-.nx-section-label {
-    font-family: 'Orbitron', sans-serif;
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.18em;
-    color: #4b5563;
-    text-transform: uppercase;
-    margin-bottom: 12px;
-    margin-top: 4px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-.nx-section-label::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: linear-gradient(90deg, rgba(124,58,237,0.3), transparent);
+[data-testid="stFileUploaderDropzone"] button span {
+    display: inline !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -921,7 +878,8 @@ with st.sidebar:
 
     st.divider()
     st.markdown("### 📤 Upload Workspace")
-    uploaded_file = st.file_uploader("Add PDF, Excel, TXT, or EML", type=["pdf", "xlsx", "txt", "eml"])
+    st.caption("Add PDF · Excel · TXT · EML")
+    uploaded_file = st.file_uploader(" ", type=["pdf", "xlsx", "txt", "eml"], label_visibility="collapsed")
     if uploaded_file is not None:
         if st.button("Save & Ingest Document", use_container_width=True, type="primary"):
             fname = uploaded_file.name
