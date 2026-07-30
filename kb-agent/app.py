@@ -622,7 +622,7 @@ def run_ingestion_with_spinner():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Session state
+# Session state & Authentication
 # ─────────────────────────────────────────────────────────────────────────────
 if "history" not in st.session_state:
     st.session_state.history = []
@@ -630,6 +630,37 @@ if "last_context" not in st.session_state:
     st.session_state.last_context = None
 if "pending_query" not in st.session_state:
     st.session_state.pending_query = None
+
+APP_PASS = os.environ.get("APP_PASSWORD", "")
+if not APP_PASS:
+    try:
+        APP_PASS = st.secrets.get("APP_PASSWORD", "")
+    except Exception:
+        APP_PASS = ""
+
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = not bool(APP_PASS)
+
+if not st.session_state.authenticated:
+    st.markdown("""
+    <div class="nx-hero" style="max-width:500px;margin:80px auto;text-align:center;">
+      <div class="nx-badge"><span class="dot"></span>NEXA SECURITY GATE</div>
+      <h2>Authentication Required</h2>
+      <p style="margin:12px 0 24px 0;">Enter workspace passkey to access knowledge base.</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col_a, col_b, col_c = st.columns([1, 2, 1])
+    with col_b:
+        pass_input = st.text_input("Workspace Passkey", type="password", key="auth_pass")
+        if st.button("Unlock Workspace 🔑", use_container_width=True, type="primary"):
+            if pass_input == APP_PASS:
+                st.session_state.authenticated = True
+                st.success("Access Granted")
+                st.rerun()
+            else:
+                st.error("Invalid Passkey")
+    st.stop()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -719,11 +750,16 @@ with st.sidebar:
 
     st.divider()
 
-    # Clear chat
+    # Clear chat & Sign Out
     if st.session_state.history:
         if st.button("🗑 Clear Chat", use_container_width=True):
             st.session_state.history = []
             st.session_state.last_context = None
+            st.rerun()
+
+    if APP_PASS:
+        if st.button("🔒 Sign Out", use_container_width=True):
+            st.session_state.authenticated = False
             st.rerun()
 
 

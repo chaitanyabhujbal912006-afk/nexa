@@ -45,25 +45,26 @@ def _load_collection():
     return client.get_or_create_collection(name="sme_knowledge_base", metadata={"hnsw:space": "cosine"})
 
 
-def retrieve(query, top_k=5, fetch_k=12):
+def retrieve(query, top_k=5, fetch_k=12, max_distance=0.75):
     """
-    Retrieves `fetch_k` nearest chunks (wider net -- TF-IDF is a cheap
-    offline substitute for a real embedding model, so we over-fetch to
-    make sure same-topic sources from *different* documents aren't missed),
-    then keeps chunks whose topic matches the dominant topic among the
-    closest few hits, capped at top_k. This is what lets a lower-ranked
-    but topically-relevant email still surface next to the PDF section
-    that contradicts it.
+    Retrieves `fetch_k` nearest chunks, applies cosine distance threshold filtering (max_distance),
+    keeps chunks matching dominant top topics, and caps at top_k.
     """
     collection = _load_collection()
     query_vec = _model.encode([query]).tolist()
     results = collection.query(query_embeddings=query_vec, n_results=fetch_k)
 
     hits = []
-    for doc, meta, dist in zip(
-        results["documents"][0], results["metadatas"][0], results["distances"][0]
-    ):
-        hits.append(RetrievalResult(doc, meta, dist))
+    if results and results.get("documents") and results["documents"][0]:
+        for doc, meta, dist in zip(
+            results["documents"][0], results["metadatas"][0], results["distances"][0]
+        ):
+            # Apply relevance distance threshold filtering
+            if dist <= max_distance:
+                hits.append(RetrievalResult(doc, meta, dist))
+
+    if not hits:
+        return []
 
     top_topics = {h.metadata.get("topic", "general") for h in hits[:2]}
     relevant = [h for h in hits if h.metadata.get("topic", "general") in top_topics]
