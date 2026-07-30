@@ -676,36 +676,79 @@ code, pre, .mono {
     font-family: 'JetBrains Mono', monospace !important;
 }
 
-/* ─── BASEWEB INPUT & SELECT FIX (DARK GLASSMORPHISM) ─── */
+/* ─── ALL INPUTS, TEXTAREAS, SELECTS — DARK THEME ─── */
+
+/* Wrapper containers */
+[data-testid="stTextInput"] > div,
+[data-testid="stTextArea"] > div,
+[data-testid="stSelectbox"] > div,
 [data-baseweb="input"],
 [data-baseweb="base-input"],
+[data-baseweb="textarea"],
 [data-baseweb="select"] > div,
-div[data-baseweb="select"] {
-    background-color: rgba(18, 8, 38, 0.85) !important;
-    border: 1px solid rgba(124, 58, 237, 0.35) !important;
+[data-baseweb="select"] > div > div {
+    background-color: rgba(18, 8, 38, 0.9) !important;
+    border: 1px solid rgba(124, 58, 237, 0.4) !important;
     border-radius: 12px !important;
     color: #e2d9f3 !important;
+    -webkit-text-fill-color: #e2d9f3 !important;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3) !important;
     transition: all 0.25s ease !important;
 }
 
+/* Actual input/textarea elements */
+[data-testid="stTextInput"] input,
+[data-testid="stTextArea"] textarea,
+[data-baseweb="input"] input,
+[data-baseweb="base-input"] input,
+[data-baseweb="textarea"] textarea,
+textarea {
+    background-color: transparent !important;
+    background: transparent !important;
+    color: #e2d9f3 !important;
+    -webkit-text-fill-color: #e2d9f3 !important;
+    caret-color: #a78bfa !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.92rem !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Placeholder text */
+[data-testid="stTextInput"] input::placeholder,
+[data-testid="stTextArea"] textarea::placeholder,
+[data-baseweb="input"] input::placeholder,
+textarea::placeholder {
+    color: rgba(148, 130, 200, 0.45) !important;
+    -webkit-text-fill-color: rgba(148, 130, 200, 0.45) !important;
+}
+
+/* Focus glow */
+[data-testid="stTextInput"] > div:focus-within,
+[data-testid="stTextArea"] > div:focus-within,
 [data-baseweb="input"]:focus-within,
 [data-baseweb="base-input"]:focus-within,
-[data-baseweb="select"] > div:focus-within {
+[data-baseweb="textarea"]:focus-within {
     border-color: rgba(167, 139, 250, 0.7) !important;
-    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2), 0 0 20px rgba(124, 58, 237, 0.25) !important;
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2), 0 0 20px rgba(124, 58, 237, 0.2) !important;
     background-color: rgba(25, 12, 50, 0.95) !important;
 }
 
-[data-testid="stTextInput"] input,
-[data-testid="stTextArea"] textarea {
-    background-color: transparent !important;
-    color: #f1f5f9 !important;
-    font-family: 'Inter', sans-serif !important;
-    font-size: 0.92rem !important;
+/* Selectbox value display */
+[data-testid="stSelectbox"] [data-baseweb="select"] span,
+[data-testid="stSelectbox"] [data-baseweb="select"] div,
+[data-baseweb="select"] span {
+    color: #e2d9f3 !important;
+    -webkit-text-fill-color: #e2d9f3 !important;
+    background: transparent !important;
 }
 
-/* Selectbox Dropdown Menu Options */
+/* Selectbox SVG arrow */
+[data-testid="stSelectbox"] svg {
+    fill: #a78bfa !important;
+}
+
+/* Dropdown menu */
 [data-baseweb="popover"],
 [data-baseweb="menu"],
 ul[data-baseweb="menu"] {
@@ -718,6 +761,7 @@ ul[data-baseweb="menu"] {
 li[data-baseweb="option"] {
     background-color: transparent !important;
     color: #cbd5e1 !important;
+    -webkit-text-fill-color: #cbd5e1 !important;
     font-family: 'Inter', sans-serif !important;
 }
 
@@ -725,6 +769,7 @@ li[data-baseweb="option"]:hover,
 li[data-baseweb="option"][aria-selected="true"] {
     background-color: rgba(124, 58, 237, 0.3) !important;
     color: #a78bfa !important;
+    -webkit-text-fill-color: #a78bfa !important;
 }
 
 /* Widget labels - scoped to avoid overriding general text */
