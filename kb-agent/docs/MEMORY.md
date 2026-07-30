@@ -8,6 +8,20 @@ Intended audience: a human teammate, or an agentic coding tool (e.g.
 Google Antigravity) reading this as project knowledge-base context before
 making changes.
 
+## 2026-07-30 — Production Hardening, UI Redesign & Enterprise API Expansion
+
+**What exists:**
+- Multi-format ingestion (PDF with OCR fallback, Excel multi-sheet, Email `.txt` & `.eml`).
+- `sentence-transformers` (`all-MiniLM-L6-v2`) semantic vector embeddings with ChromaDB persistence.
+- FastAPI REST backend (`api.py`) exposing `/api/v1/health`, `/api/v1/query`, `/api/v1/ingest`, `/api/v1/documents`, and `/api/v1/conflicts`.
+- Hardened security: Passkey Auth Gate (`APP_PASSWORD`), `X-API-Key` REST authentication, scoped CORS, XSS sanitization, path-traversal upload protection, and in-process ingestion lock.
+- Dedicated `◈ DOCUMENTS` tab with single-click instant vector & file deletion (`delete_document_from_index()`).
+- Proactive Knowledge Base Conflict Scanner (`scan_all_conflicts()`) with 1-click full-database contradiction audit.
+- Multi-format CRM ticket exports (downloadable `.json` and `.csv` payloads).
+- Interactive visual analytics charts (bar charts for document breakdown & resolution rates).
+- Automated Webhook dispatch (`NEXA_WEBHOOK_URL`) for Slack/Discord conflict & flag alerts.
+- Streamlit Cloud self-healing setup (root `requirements.txt`, `sys.path` resolution, and automatic vector store auto-ingestion on fresh cloud deploy).
+
 ---
 
 ## 2026-07-25 — Prototype built, restyled, docs added
