@@ -1,6 +1,6 @@
 """
 FastAPI REST server for Nexa Knowledge Agent.
-Exposes RAG retrieval, conflict detection, and document ingestion via API endpoints.
+Security-hardened: API key auth, safe CORS, clamped inputs, no error leakage, ingestion lock.
 
 Run: uvicorn api:app --reload --port 8000
 """
@@ -8,30 +8,62 @@ Run: uvicorn api:app --reload --port 8000
 import os
 import glob
 import subprocess
+import threading
+import logging
 from typing import List, Optional
-from pydantic import BaseModel
-from fastapi import FastAPI, HTTPException
+
+from pydantic import BaseModel, Field, field_validator
+from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 
 from rag_engine import retrieve, detect_conflicts, generate_answer
-from app import get_llm_fn, get_active_provider
+from llm_config import load_secrets, get_llm_fn, get_active_provider
 
+# ── Logging ──────────────────────────────────────────────────────────────────
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("nexa-api")
+
+# ── Load secrets on startup ───────────────────────────────────────────────────
+load_secrets()
+
+# ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(
     title="Nexa Intelligence Engine API",
     description="Enterprise conflict-aware RAG system API",
-    version="2.0.0"
+    version="2.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
 
-# Enable CORS for web and mobile frontends
+# ── CORS — explicit origins only ──────────────────────────────────────────────
+_ALLOWED_ORIGINS = os.environ.get(
+    "NEXA_ALLOWED_ORIGINS", "http://localhost:8501,http://localhost:3000"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=[o.strip() for o in _ALLOWED_ORIGINS],
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "X-API-Key"],
 )
 
+# ── Ingestion lock (prevent concurrent subprocess runs) ───────────────────────
+_ingest_lock = threading.Lock()
 
+# ── Auth dependency ───────────────────────────────────────────────────────────
+_NEXA_API_KEY = os.environ.get("NEXA_API_KEY", "")
+
+
+def require_api_key(x_api_key: Optional[str] = Header(default=None)):
+    """Require X-API-Key header if NEXA_API_KEY env var is set."""
+    if not _NEXA_API_KEY:
+        return  # No key configured — open mode (dev/demo)
+    if x_api_key != _NEXA_API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key.")
+
+
+# ── Pydantic Models ───────────────────────────────────────────────────────────
 class CitationModel(BaseModel):
     citation: str
     source_name: str
@@ -46,8 +78,16 @@ class ConflictModel(BaseModel):
 
 
 class QueryRequest(BaseModel):
-    query: str
-    top_k: Optional[int] = 5
+    query: str = Field(..., min_length=1, max_length=2000)
+    top_k: int = Field(5, ge=1, le=20)
+
+    @field_validator("query")
+    @classmethod
+    def strip_query(cls, v):
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("Query cannot be empty.")
+        return stripped
 
 
 class QueryResponse(BaseModel):
@@ -66,27 +106,23 @@ class HealthResponse(BaseModel):
     total_emails: int
 
 
+# ── Routes ────────────────────────────────────────────────────────────────────
 @app.get("/api/v1/health", response_model=HealthResponse)
 def health_check():
+    """Public health check — no auth required."""
     base_dir = os.path.dirname(__file__)
-    pdf_count = len(glob.glob(os.path.join(base_dir, "data", "pdf_src", "*.pdf")))
-    sheet_count = len(glob.glob(os.path.join(base_dir, "data", "*.xlsx")))
-    email_count = len(glob.glob(os.path.join(base_dir, "data", "emails", "*.*")))
-    
     return HealthResponse(
         status="online",
         provider=get_active_provider(),
-        total_pdfs=pdf_count,
-        total_sheets=sheet_count,
-        total_emails=email_count
+        total_pdfs=len(glob.glob(os.path.join(base_dir, "data", "pdf_src", "*.pdf"))),
+        total_sheets=len(glob.glob(os.path.join(base_dir, "data", "*.xlsx"))),
+        total_emails=len(glob.glob(os.path.join(base_dir, "data", "emails", "*.*"))),
     )
 
 
-@app.post("/api/v1/query", response_model=QueryResponse)
+@app.post("/api/v1/query", response_model=QueryResponse, dependencies=[Depends(require_api_key)])
 def query_knowledge_base(req: QueryRequest):
-    if not req.query.strip():
-        raise HTTPException(status_code=400, detail="Query cannot be empty.")
-    
+    """Query the knowledge base. Requires X-API-Key header if NEXA_API_KEY is set."""
     try:
         hits = retrieve(req.query, top_k=req.top_k)
         conflicts = detect_conflicts(hits)
@@ -116,19 +152,39 @@ def query_knowledge_base(req: QueryRequest):
             answer=answer,
             conflicts_detected=conflict_objs,
             citations=citation_objs,
-            provider=get_active_provider()
+            provider=get_active_provider(),
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Query error: %s", e)
+        raise HTTPException(status_code=500, detail="Internal server error.")
 
 
-@app.post("/api/v1/ingest")
+@app.post("/api/v1/ingest", dependencies=[Depends(require_api_key)])
 def trigger_ingestion():
+    """Trigger document re-ingestion. Requires auth. Only one run at a time."""
+    if not _ingest_lock.acquire(blocking=False):
+        raise HTTPException(status_code=429, detail="Ingestion already running. Try again later.")
     try:
-        cmd = ["python", "ingest.py"]
-        res = subprocess.run(cmd, cwd=os.path.dirname(__file__), capture_output=True, text=True)
+        ingest_path = os.path.join(os.path.dirname(__file__), "ingest.py")
+        if not os.path.isfile(ingest_path):
+            raise HTTPException(status_code=500, detail="Ingestion script not found.")
+        res = subprocess.run(
+            ["python", ingest_path],
+            cwd=os.path.dirname(__file__),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
         if res.returncode != 0:
-            raise HTTPException(status_code=500, detail=res.stderr)
-        return {"status": "success", "output": res.stdout.strip()}
+            logger.error("Ingestion failed: %s", res.stderr)
+            raise HTTPException(status_code=500, detail="Ingestion failed. Check server logs.")
+        return {"status": "success", "message": "Re-ingestion complete."}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Ingestion error: %s", e)
+        raise HTTPException(status_code=500, detail="Internal server error.")
+    finally:
+        _ingest_lock.release()
