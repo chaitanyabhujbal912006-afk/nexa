@@ -7,7 +7,7 @@ from datetime import datetime
 
 import streamlit as st
 
-from rag_engine import retrieve, detect_conflicts, generate_answer
+from rag_engine import retrieve, detect_conflicts, generate_answer, delete_document_from_index
 from llm_config import load_secrets, get_active_provider, get_llm_fn
 
 st.set_page_config(
@@ -558,17 +558,20 @@ def count_docs():
 
 
 def get_all_documents():
-    """Return a list of (icon, short_name, date_hint) for the document browser."""
+    """Return structured document objects for the document browser and management tab."""
     docs = []
     for p in sorted(glob.glob(os.path.join(DATA_DIR, "pdf_src", "*.pdf"))):
         name = os.path.basename(p)
-        docs.append(("📄", name, _hint_date(name)))
+        size_kb = round(os.path.getsize(p) / 1024, 1)
+        docs.append({"icon": "📄", "name": name, "type": "PDF", "date": _hint_date(name), "path": p, "size_kb": size_kb})
     for p in sorted(glob.glob(os.path.join(DATA_DIR, "*.xlsx"))):
         name = os.path.basename(p)
-        docs.append(("📊", name, "—"))
+        size_kb = round(os.path.getsize(p) / 1024, 1)
+        docs.append({"icon": "📊", "name": name, "type": "Excel", "date": "—", "path": p, "size_kb": size_kb})
     for p in sorted(glob.glob(os.path.join(DATA_DIR, "emails", "*.*"))):
         name = os.path.basename(p)
-        docs.append(("✉", name, _hint_date(name)))
+        size_kb = round(os.path.getsize(p) / 1024, 1)
+        docs.append({"icon": "✉", "name": name, "type": "Email", "date": _hint_date(name), "path": p, "size_kb": size_kb})
     return docs
 
 
@@ -704,13 +707,14 @@ with st.sidebar:
     all_docs = get_all_documents()
     if all_docs:
         docs_html = ""
-        for icon, name, date in all_docs:
+        for d in all_docs:
+            name = d["name"]
             short = name[:28] + "…" if len(name) > 28 else name
             docs_html += f"""
             <div class="doc-item">
-              <span class="doc-icon">{icon}</span>
+              <span class="doc-icon">{d['icon']}</span>
               <span class="doc-name" title="{name}">{short}</span>
-              <span class="doc-date">{date}</span>
+              <span class="doc-date">{d['date']}</span>
             </div>"""
         st.markdown(docs_html, unsafe_allow_html=True)
     else:
@@ -766,8 +770,9 @@ with st.sidebar:
 # ─────────────────────────────────────────────────────────────────────────────
 # MAIN TABS
 # ─────────────────────────────────────────────────────────────────────────────
-tab_copilot, tab_crm, tab_analytics = st.tabs([
+tab_copilot, tab_docs, tab_crm, tab_analytics = st.tabs([
     "◈  AI COPILOT",
+    "◈  DOCUMENTS",
     "◈  CRM STUDIO",
     "◈  ANALYTICS",
 ])
@@ -884,7 +889,63 @@ with tab_copilot:
             }
 
 
-# ── TAB 2: CRM STUDIO ─────────────────────────────────────────────────────────
+# ── TAB 2: DOCUMENTS (LIFECYCLE MANAGEMENT) ──────────────────────────────────
+with tab_docs:
+    st.markdown('<div class="nx-section-label">Document Repository & Index Management</div>', unsafe_allow_html=True)
+    st.caption("Manage ingested business records, view index status, and delete outdated source files.")
+
+    all_docs = get_all_documents()
+
+    if not all_docs:
+        st.info("No documents currently stored. Upload files via the sidebar.")
+    else:
+        # Search & filter bar
+        col_search, col_filter = st.columns([3, 1])
+        with col_search:
+            search_term = st.text_input("🔍 Search documents...", key="doc_search", placeholder="Filter by document name or keyword...").strip().lower()
+        with col_filter:
+            doc_type_filter = st.selectbox("Type Filter", ["All", "PDF", "Excel", "Email"], key="doc_filter")
+
+        filtered_docs = [
+            d for d in all_docs
+            if (not search_term or search_term in d["name"].lower())
+            and (doc_type_filter == "All" or d["type"] == doc_type_filter)
+        ]
+
+        st.write("")
+        st.markdown(f"**Showing {len(filtered_docs)} of {len(all_docs)} documents**")
+
+        for idx, doc in enumerate(filtered_docs):
+            with st.container():
+                cols = st.columns([0.5, 3, 1.5, 1.5, 2])
+                with cols[0]:
+                    st.markdown(f"### {doc['icon']}")
+                with cols[1]:
+                    st.markdown(f"**{doc['name']}**")
+                    st.caption(f"Path: `data/{doc['type'].lower() if doc['type'] != 'Excel' else ''}/{doc['name']}`")
+                with cols[2]:
+                    st.markdown(f"**Type:** {doc['type']}")
+                    st.caption(f"Size: {doc['size_kb']} KB")
+                with cols[3]:
+                    st.markdown(f"**Document Date:**")
+                    st.caption(f"`{doc['date']}`")
+                with cols[4]:
+                    if st.button("🗑 Delete File", key=f"del_doc_{idx}_{doc['name']}", type="secondary", use_container_width=True):
+                        # Delete vector embeddings from ChromaDB
+                        chunks_deleted = delete_document_from_index(doc["name"])
+                        # Remove file from disk
+                        try:
+                            if os.path.exists(doc["path"]):
+                                os.remove(doc["path"])
+                            st.success(f"Deleted `{doc['name']}` ({chunks_deleted} vector chunks removed).")
+                            st.rerun()
+                        except Exception as err:
+                            st.error(f"Failed to delete file: {err}")
+
+                st.divider()
+
+
+# ── TAB 3: CRM STUDIO ─────────────────────────────────────────────────────────
 with tab_crm:
     st.markdown('<div class="nx-section-label">CRM Support Ticket Generator</div>', unsafe_allow_html=True)
     st.caption("Auto-populate customer support tickets from Nexa's cited answers.")

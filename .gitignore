@@ -19,6 +19,7 @@ venv/
 audit_log.jsonl
 **/audit_log.jsonl
 *.log
+*.cpp
 
 # Local AI agent config (not part of the project)
 .agents/

@@ -45,6 +45,16 @@ def _load_collection():
     return client.get_or_create_collection(name="sme_knowledge_base", metadata={"hnsw:space": "cosine"})
 
 
+def delete_document_from_index(source_name: str) -> int:
+    """Removes all vector embeddings associated with source_name from ChromaDB."""
+    collection = _load_collection()
+    res = collection.get(where={"source_name": source_name})
+    if res and res.get("ids"):
+        collection.delete(ids=res["ids"])
+        return len(res["ids"])
+    return 0
+
+
 def retrieve(query, top_k=5, fetch_k=12, max_distance=0.75):
     """
     Retrieves `fetch_k` nearest chunks, applies cosine distance threshold filtering (max_distance),
