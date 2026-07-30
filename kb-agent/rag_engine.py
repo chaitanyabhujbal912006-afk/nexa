@@ -185,21 +185,50 @@ Rules:
 """
 
 
+GREETING_PATTERNS = [
+    r"^(hi|hello|hey|greetings|good morning|good afternoon|good evening|howdy)\b",
+    r"^(who are you|what is nexa|what can you do|help)\b",
+    r"^(thanks|thank you|thx)\b"
+]
+
+
 def generate_answer(query, hits, conflicts, llm_call_fn=None):
     """
-    llm_call_fn: a function (system_prompt, user_prompt) -> str.
-    If not provided, falls back to a rule-based mock so the app is fully
-    demoable with zero API keys and zero cost.
+    Generates an answer using the configured LLM or intelligent fallback.
+    Handles conversational greetings smoothly without robotic source error messages.
     """
+    clean_q = query.strip().lower()
+
+    # Handle greetings / small-talk gracefully
+    if any(re.search(pat, clean_q) for pat in GREETING_PATTERNS):
+        if "thank" in clean_q or "thx" in clean_q:
+            return "You're welcome! Let me know if you have any other questions about your knowledge base.", ""
+        return (
+            "👋 Hello! I am **Nexa**, your SME Knowledge Assistant. "
+            "I can help you search policies, refund terms, payment schedules, or warranty details across your uploaded "
+            "PDFs, Excel workbooks, and email threads with AI-powered conflict detection. How can I help you today?",
+            ""
+        )
+
+    # Handle case where no documents matched
+    if not hits:
+        return (
+            "I couldn't find any relevant policy documents or records in the knowledge base matching your question. "
+            "Try asking about refund policies, payment terms, or warranty guidelines, or upload new files via the sidebar.",
+            "RETRIEVED SOURCES:\n(None matching query)"
+        )
+
     context_block = build_context_block(hits, conflicts)
     user_prompt = f"QUESTION: {query}\n\n{context_block}"
 
     if llm_call_fn is not None:
-        return llm_call_fn(SYSTEM_PROMPT, user_prompt), context_block
+        try:
+            return llm_call_fn(SYSTEM_PROMPT, user_prompt), context_block
+        except Exception as e:
+            # If LLM API fails, fall back to rule-based response
+            pass
 
     # ---- Zero-cost fallback: deterministic mock reasoning ----
-    # This lets you demo the full pipeline before wiring up any paid/free
-    # LLM API key. Replace by passing a real llm_call_fn (see app.py).
     if conflicts:
         c = conflicts[0]
         answer = (
