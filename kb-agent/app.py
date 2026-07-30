@@ -371,7 +371,11 @@ code, pre, .mono {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 15px rgba(124, 58, 237, 0.15) !important;
     overflow: hidden !important;
 }
-[data-testid="stChatInput"] textarea {
+[data-testid="stChatInput"] textarea,
+[data-testid="stChatInputTextArea"] textarea,
+[data-testid="stChatInput"] [data-baseweb="textarea"] textarea,
+[data-testid="stChatInput"] p,
+[data-testid="stChatInput"] div[contenteditable] {
     background: transparent !important;
     border: none !important;
     color: #e2d9f3 !important;
@@ -379,10 +383,20 @@ code, pre, .mono {
     font-size: 0.92rem !important;
     padding: 12px 16px !important;
     box-shadow: none !important;
+    caret-color: #a78bfa !important;
+    -webkit-text-fill-color: #e2d9f3 !important;
 }
-[data-testid="stChatInput"] textarea:focus {
+[data-testid="stChatInput"] textarea::placeholder,
+[data-testid="stChatInputTextArea"] textarea::placeholder {
+    color: rgba(148, 130, 200, 0.5) !important;
+    -webkit-text-fill-color: rgba(148, 130, 200, 0.5) !important;
+}
+[data-testid="stChatInput"] textarea:focus,
+[data-testid="stChatInputTextArea"] textarea:focus {
     box-shadow: none !important;
     background: transparent !important;
+    color: #e2d9f3 !important;
+    -webkit-text-fill-color: #e2d9f3 !important;
 }
 [data-testid="stChatInput"] button {
     background: linear-gradient(135deg, #7c3aed, #ec4899) !important;
