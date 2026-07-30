@@ -6,11 +6,14 @@ Run: uvicorn api:app --reload --port 8000
 """
 
 import os
+import sys
 import glob
 import subprocess
 import threading
 import logging
 from typing import List, Optional
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from pydantic import BaseModel, Field, field_validator
 from fastapi import FastAPI, HTTPException, Depends, Header

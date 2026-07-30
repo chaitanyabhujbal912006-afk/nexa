@@ -1,9 +1,13 @@
 import os
+import sys
 import glob
 import html
 import subprocess
 import threading
 from datetime import datetime
+
+# Ensure kb-agent folder is on Python path regardless of execution root (e.g. Streamlit Cloud)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import streamlit as st
 
