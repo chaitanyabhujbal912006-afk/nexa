@@ -137,6 +137,23 @@ def detect_conflicts(hits):
     return conflicts
 
 
+def scan_all_conflicts():
+    """
+    Performs a full proactive audit of the ChromaDB collection to identify all policy
+    contradictions across all indexed documents and topics.
+    """
+    collection = _load_collection()
+    res = collection.get()
+    if not res or not res.get("documents"):
+        return []
+
+    all_hits = []
+    for doc, meta in zip(res["documents"], res["metadatas"]):
+        all_hits.append(RetrievalResult(doc, meta, distance=0.0))
+
+    return detect_conflicts(all_hits)
+
+
 def build_context_block(hits, conflicts):
     """Builds the context + conflict-awareness block fed to the LLM."""
     lines = ["RETRIEVED SOURCES:"]

@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field, field_validator
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 
-from rag_engine import retrieve, detect_conflicts, generate_answer
+from rag_engine import retrieve, detect_conflicts, generate_answer, scan_all_conflicts
 from llm_config import load_secrets, get_llm_fn, get_active_provider
 
 # ── Logging ──────────────────────────────────────────────────────────────────
@@ -188,3 +188,39 @@ def trigger_ingestion():
         raise HTTPException(status_code=500, detail="Internal server error.")
     finally:
         _ingest_lock.release()
+
+
+@app.get("/api/v1/documents", dependencies=[Depends(require_api_key)])
+def list_documents():
+    """List all ingested documents with metadata."""
+    base_dir = os.path.dirname(__file__)
+    data_dir = os.path.join(base_dir, "data")
+    
+    docs = []
+    for path in glob.glob(os.path.join(data_dir, "pdf_src", "*.pdf")):
+        docs.append({"name": os.path.basename(path), "type": "pdf", "size_bytes": os.path.getsize(path)})
+    for path in glob.glob(os.path.join(data_dir, "*.xlsx")):
+        docs.append({"name": os.path.basename(path), "type": "excel", "size_bytes": os.path.getsize(path)})
+    for path in glob.glob(os.path.join(data_dir, "emails", "*.*")):
+        docs.append({"name": os.path.basename(path), "type": "email", "size_bytes": os.path.getsize(path)})
+        
+    return {"total_count": len(docs), "documents": docs}
+
+
+@app.get("/api/v1/conflicts", dependencies=[Depends(require_api_key)])
+def get_all_policy_conflicts():
+    """Performs a proactive full health audit across all indexed documents to return active policy conflicts."""
+    try:
+        conflicts = scan_all_conflicts()
+        conflict_objs = [
+            ConflictModel(
+                topic=c["topic"],
+                trusted_source=c["trusted"].citation,
+                outdated_sources=[o.citation for o in c["outdated"]],
+            )
+            for c in conflicts
+        ]
+        return {"conflicts_count": len(conflict_objs), "conflicts": conflict_objs}
+    except Exception as e:
+        logger.exception("Conflict scan error: %s", e)
+        raise HTTPException(status_code=500, detail="Internal server error.")

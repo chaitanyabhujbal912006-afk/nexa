@@ -7,7 +7,7 @@ from datetime import datetime
 
 import streamlit as st
 
-from rag_engine import retrieve, detect_conflicts, generate_answer, delete_document_from_index
+from rag_engine import retrieve, detect_conflicts, generate_answer, delete_document_from_index, scan_all_conflicts
 from llm_config import load_secrets, get_active_provider, get_llm_fn
 
 st.set_page_config(
@@ -943,6 +943,28 @@ with tab_docs:
                             st.error(f"Failed to delete file: {err}")
 
                 st.divider()
+
+        st.markdown('<div class="nx-section-label">⚡ Proactive Policy Conflict Scanner</div>', unsafe_allow_html=True)
+        st.caption("Perform a proactive full-database scan to identify all active policy contradictions across your knowledge base.")
+
+        if st.button("🔎 Scan Entire Knowledge Base for Conflicts", key="btn_scan_all_conflicts", use_container_width=False):
+            with st.spinner("Scanning all indexed documents..."):
+                active_conflicts = scan_all_conflicts()
+                if not active_conflicts:
+                    st.success("✅ Clean Knowledge Base: Zero contradictions detected across indexed documents!")
+                else:
+                    st.warning(f"⚠️ Detected {len(active_conflicts)} active policy conflict(s) across your documents:")
+                    for c in active_conflicts:
+                        st.markdown(f"""
+<div class="nx-conflict">
+  <div class="nx-conflict-title">Policy conflict on &laquo;{html.escape(c['topic'].replace('_', ' ').upper())}&raquo;</div>
+  <div class="nx-conflict-row">
+    <span class="nx-conflict-tag trusted">TRUSTED</span>
+    <span>{html.escape(c['trusted'].citation)}</span>
+  </div>
+  {''.join(f'<div class="nx-conflict-row"><span class="nx-conflict-tag outdated">SUPERSEDED</span><span>{html.escape(o.citation)}</span></div>' for o in c['outdated'])}
+</div>
+                        """, unsafe_allow_html=True)
 
 
 # ── TAB 3: CRM STUDIO ─────────────────────────────────────────────────────────
