@@ -17,8 +17,14 @@ DB_DIR = os.path.join(BASE_DIR, "chroma_db")
 
 EMBED_MODEL = "all-MiniLM-L6-v2"
 
-# Load model once at module import — keeps retrieval fast (no re-init per query).
-_model = SentenceTransformer(EMBED_MODEL)
+_model_instance = None
+
+def get_model():
+    """Lazy load the sentence transformer model on demand."""
+    global _model_instance
+    if _model_instance is None:
+        _model_instance = SentenceTransformer(EMBED_MODEL)
+    return _model_instance
 
 
 class RetrievalResult:
@@ -72,7 +78,8 @@ def retrieve(query, top_k=5, fetch_k=12, max_distance=0.75):
     keeps chunks matching dominant top topics, and caps at top_k.
     """
     collection = _load_collection()
-    query_vec = _model.encode([query]).tolist()
+    model = get_model()
+    query_vec = model.encode([query]).tolist()
     results = collection.query(query_embeddings=query_vec, n_results=fetch_k)
 
     hits = []
