@@ -42,7 +42,18 @@ class RetrievalResult:
 
 def _load_collection():
     client = chromadb.PersistentClient(path=DB_DIR)
-    return client.get_or_create_collection(name="sme_knowledge_base", metadata={"hnsw:space": "cosine"})
+    collection = client.get_or_create_collection(name="sme_knowledge_base", metadata={"hnsw:space": "cosine"})
+    
+    # Auto-ingest if collection is empty (e.g. fresh cloud deploy or clean environment)
+    if collection.count() == 0:
+        try:
+            import ingest
+            ingest.main()
+            collection = client.get_or_create_collection(name="sme_knowledge_base", metadata={"hnsw:space": "cosine"})
+        except Exception as e:
+            print(f"Warning: Auto-ingest on startup failed: {e}")
+            
+    return collection
 
 
 def delete_document_from_index(source_name: str) -> int:

@@ -605,24 +605,17 @@ def pill_icon(h):
 
 
 def run_ingestion_with_spinner():
-    """Run ingest.py in subprocess with a lock to prevent concurrent runs."""
+    """Run ingest in-process with a lock to prevent concurrent runs."""
     if not _ingest_lock.acquire(blocking=False):
         st.warning("⏳ Ingestion already running. Please wait.")
         return False
     try:
         with st.spinner("🔄 Re-indexing knowledge base..."):
-            ingest_script = os.path.join(BASE_DIR, "ingest.py")
-            result = subprocess.run(
-                ["python", ingest_script],
-                cwd=BASE_DIR,
-                capture_output=True, text=True, timeout=300,
-            )
-        if result.returncode != 0:
-            st.error(f"Ingestion failed: {result.stderr[:300]}")
-            return False
+            import ingest
+            ingest.main()
         return True
-    except subprocess.TimeoutExpired:
-        st.error("Ingestion timed out after 5 minutes.")
+    except Exception as e:
+        st.error(f"Ingestion failed: {e}")
         return False
     finally:
         _ingest_lock.release()
