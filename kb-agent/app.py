@@ -992,7 +992,33 @@ with tab_crm:
   <div style="font-size:0.8rem;color:#6b7280;margin-top:4px;">Ready to sync · HubSpot / Zendesk / Salesforce</div>
 </div>
             """, unsafe_allow_html=True)
-            st.json(ticket)
+            
+            import json
+            import pandas as pd
+            ticket_json = json.dumps(ticket, indent=2)
+            ticket_df = pd.DataFrame([ticket])
+            ticket_csv = ticket_df.to_csv(index=False)
+
+            col_dl1, col_dl2 = st.columns(2)
+            with col_dl1:
+                st.download_button(
+                    label="📥 Download JSON Ticket",
+                    data=ticket_json,
+                    file_name=f"{ticket['id']}.json",
+                    mime="application/json",
+                    use_container_width=True
+                )
+            with col_dl2:
+                st.download_button(
+                    label="📊 Download CSV Record",
+                    data=ticket_csv,
+                    file_name=f"{ticket['id']}.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+
+            with st.expander("◈ View Raw JSON Payload"):
+                st.json(ticket)
 
 
 # ── TAB 3: ANALYTICS ──────────────────────────────────────────────────────────
@@ -1023,6 +1049,32 @@ with tab_analytics:
         st.metric("Flagged Responses", flagged)
     with col_d:
         st.metric("Embedder", "384-dim MiniLM")
+
+    st.divider()
+
+    # Visual Analytics Charts
+    st.markdown('<div class="nx-section-label">Document Distribution & Query Metrics</div>', unsafe_allow_html=True)
+    
+    col_chart1, col_chart2 = st.columns(2)
+    
+    import pandas as pd
+    
+    with col_chart1:
+        st.caption("📄 Knowledge Base Document Types")
+        doc_counts = pd.DataFrame({
+            "Source Type": ["PDF Documents", "Excel Workbooks", "Email Threads"],
+            "Count": [pdf_count, sheet_count, email_count]
+        }).set_index("Source Type")
+        st.bar_chart(doc_counts, color="#7c3aed")
+        
+    with col_chart2:
+        st.caption("⚡ Resolution & Conflict Rates")
+        normal_queries = max(0, len(audit_entries) - conflict_count - flagged)
+        resolution_counts = pd.DataFrame({
+            "Category": ["Direct Answers", "Conflicts Detected", "Flagged Queries"],
+            "Queries": [normal_queries, conflict_count, flagged]
+        }).set_index("Category")
+        st.bar_chart(resolution_counts, color="#ec4899")
 
     st.divider()
 
