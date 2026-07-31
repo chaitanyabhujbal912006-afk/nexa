@@ -24,6 +24,7 @@ EMBED_MODEL = "all-MiniLM-L6-v2"
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 DB_DIR = os.path.join(os.path.dirname(__file__), "chroma_db")
 
+import email
 import email.utils
 
 DATE_PATTERNS = [

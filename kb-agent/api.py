@@ -210,6 +210,53 @@ def list_documents():
     return {"total_count": len(docs), "documents": docs}
 
 
+@app.delete("/api/v1/documents/{doc_name}", dependencies=[Depends(require_api_key)])
+def delete_document(doc_name: str):
+    """Delete a document from disk and remove its vectors from ChromaDB index."""
+    import urllib.parse
+    from rag_engine import delete_document_from_index
+
+    # Prevent path traversal: accept only basename
+    safe_name = os.path.basename(urllib.parse.unquote(doc_name))
+    if not safe_name or safe_name != doc_name:
+        raise HTTPException(status_code=400, detail="Invalid document name.")
+
+    base_dir = os.path.dirname(__file__)
+    data_dir = os.path.join(base_dir, "data")
+
+    # Find file across all supported locations
+    candidate_dirs = [
+        os.path.join(data_dir, "pdf_src"),
+        data_dir,
+        os.path.join(data_dir, "emails"),
+    ]
+    file_path = None
+    for d in candidate_dirs:
+        candidate = os.path.join(d, safe_name)
+        if os.path.isfile(candidate):
+            file_path = candidate
+            break
+
+    if file_path is None:
+        raise HTTPException(status_code=404, detail=f"Document '{safe_name}' not found.")
+
+    try:
+        chunks_deleted = delete_document_from_index(safe_name)
+        os.remove(file_path)
+        logger.info("Deleted document '%s' (%d vector chunks removed).", safe_name, chunks_deleted)
+        return {
+            "status": "deleted",
+            "document": safe_name,
+            "vector_chunks_removed": chunks_deleted,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Delete error for '%s': %s", safe_name, e)
+        raise HTTPException(status_code=500, detail="Internal server error.")
+
+
+
 @app.get("/api/v1/conflicts", dependencies=[Depends(require_api_key)])
 def get_all_policy_conflicts():
     """Performs a proactive full health audit across all indexed documents to return active policy conflicts."""

@@ -7,7 +7,7 @@ No Streamlit dependency here.
 import os
 
 GROQ_MODEL = "llama-3.3-70b-versatile"
-GEMINI_MODEL = "gemini-1.5-flash"
+GEMINI_MODEL = "gemini-2.0-flash"
 
 
 def load_secrets():

@@ -554,6 +554,61 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 KNOWN_CLIENTS = ["acme", "beta", "gamma", "delta", "alpha"]
 
 
+@st.cache_data(ttl=120)
+def _get_dynamic_suggestions():
+    """Pull top 3 topic examples from the ChromaDB collection for dynamic suggestion chips."""
+    try:
+        import chromadb
+        client = chromadb.PersistentClient(path=os.path.join(BASE_DIR, "chroma_db"))
+        col = client.get_or_create_collection("sme_knowledge_base")
+        if col.count() == 0:
+            return None
+        sample = col.get(limit=200, include=["metadatas"])
+        topics = {}
+        for meta in sample.get("metadatas", []):
+            topic = meta.get("topic", "").replace("_", " ")
+            src = meta.get("source_name", "")
+            if topic and topic != "general" and src:
+                topics[topic] = src
+        # Return up to 3 unique topic phrases as example questions
+        candidates = sorted(topics.items())[:3]
+        return [f"Tell me about {t} in {s}" for t, s in candidates] if candidates else None
+    except Exception:
+        return None
+
+
+def _confidence_label(hits):
+    """Map average retrieval distance to a human-readable confidence label and colour."""
+    if not hits:
+        return "N/A", "#4b5563"
+    avg = sum(h.distance for h in hits) / len(hits)
+    if avg <= 0.30:
+        return "HIGH", "#34d399"
+    if avg <= 0.55:
+        return "MEDIUM", "#fbbf24"
+    return "LOW", "#f87171"
+
+
+def _build_history_context(history, max_turns=3):
+    """Build a formatted prior-turn context block from session history (last max_turns pairs)."""
+    pairs = []
+    i = 0
+    while i < len(history) - 1:
+        if history[i]["role"] == "user" and history[i+1]["role"] == "assistant":
+            pairs.append((history[i]["content"], history[i+1]["content"]))
+            i += 2
+        else:
+            i += 1
+    recent = pairs[-max_turns:]
+    if not recent:
+        return ""
+    lines = ["PREVIOUS CONVERSATION TURNS (for context only, do not re-cite unless the user asks):\n"]
+    for u, a in recent:
+        lines.append(f"User: {u[:300]}")
+        lines.append(f"Assistant: {a[:500]}\n")
+    return "\n".join(lines) + "\n\n"
+
+
 def count_docs():
     pdfs = glob.glob(os.path.join(DATA_DIR, "pdf_src", "*.pdf"))
     sheets = glob.glob(os.path.join(DATA_DIR, "*.xlsx"))
@@ -778,8 +833,9 @@ tab_copilot, tab_docs, tab_crm, tab_analytics = st.tabs([
 # ── TAB 1: COPILOT ────────────────────────────────────────────────────────────
 with tab_copilot:
 
-    # Suggested queries — always visible as chips above the input
-    EXAMPLES = [
+    # Suggested queries — dynamic from indexed topics, fallback to defaults
+    _dynamic = _get_dynamic_suggestions()
+    EXAMPLES = _dynamic if _dynamic else [
         "What is our refund policy for bulk orders quoted to Acme Corp?",
         "What payment terms apply to Beta LLC orders now?",
         "What's the current warranty period for hardware products?",
@@ -800,8 +856,9 @@ with tab_copilot:
 
     # Chat input
     query = st.chat_input("Query your knowledge base...")
-    if not query and st.session_state.pending_query:
-        query = st.session_state.pop("pending_query")
+    if not query and st.session_state.get("pending_query"):
+        query = st.session_state["pending_query"]
+        del st.session_state["pending_query"]
 
     if query:
         st.session_state.history.append({"role": "user", "content": query})
@@ -812,7 +869,19 @@ with tab_copilot:
             with st.spinner("Scanning knowledge base..."):
                 hits = retrieve(query, top_k=5)
                 conflicts = detect_conflicts(hits)
-                answer, context_block = generate_answer(query, hits, conflicts, llm_call_fn=get_llm_fn())
+                # Multi-turn memory: inject prior conversation context into the user prompt
+                history_ctx = _build_history_context(st.session_state.history[:-1])  # exclude current user msg
+                from rag_engine import build_context_block, SYSTEM_PROMPT
+                context_block = build_context_block(hits, conflicts)
+                augmented_prompt = f"{history_ctx}QUESTION: {query}\n\n{context_block}" if history_ctx else f"QUESTION: {query}\n\n{context_block}"
+                llm_fn = get_llm_fn()
+                if llm_fn:
+                    try:
+                        answer = llm_fn(SYSTEM_PROMPT, augmented_prompt)
+                    except Exception:
+                        answer, _ = generate_answer(query, hits, conflicts, llm_call_fn=None)
+                else:
+                    answer, _ = generate_answer(query, hits, conflicts, llm_call_fn=None)
 
             # Conflict boxes
             if conflicts:
@@ -828,10 +897,16 @@ with tab_copilot:
 </div>
                     """, unsafe_allow_html=True)
 
-            # Answer — XSS safe: escape LLM output before injecting
-            st.markdown("""<div class="nx-answer-header">
+            # Confidence badge computed from retrieval distances
+            conf_label, conf_color = _confidence_label(hits)
+            st.markdown(f"""<div class="nx-answer-header">
   <span style="color:#7c3aed;font-size:1rem;">◈</span>
   <span class="nx-answer-header-text">Nexa Response</span>
+  <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:0.6rem;font-weight:700;
+         color:{conf_color};background:rgba(0,0,0,0.3);padding:2px 10px;border-radius:100px;
+         border:1px solid {conf_color}44;letter-spacing:0.1em;">
+    CONFIDENCE · {conf_label}
+  </span>
 </div>""", unsafe_allow_html=True)
 
             # Render LLM answer safely via st.markdown (not raw HTML injection)
@@ -894,7 +969,15 @@ with tab_docs:
     all_docs = get_all_documents()
 
     if not all_docs:
-        st.info("No documents currently stored. Upload files via the sidebar.")
+        st.markdown("""
+<div style="text-align:center;padding:56px 0;">
+  <div style="font-size:3rem;margin-bottom:14px;">📂</div>
+  <div style="font-family:'Orbitron',sans-serif;font-size:0.85rem;color:#6d28d9;letter-spacing:0.15em;margin-bottom:8px;">EMPTY KNOWLEDGE BASE</div>
+  <div style="font-size:0.88rem;color:#4b5563;max-width:380px;margin:0 auto;line-height:1.7;">
+    No documents have been ingested yet.<br>Use the <strong style="color:#a78bfa;">📤 Upload</strong> panel in the sidebar to add PDFs, Excel workbooks, or email files.
+  </div>
+</div>
+""", unsafe_allow_html=True)
     else:
         # Search & filter bar
         col_search, col_filter = st.columns([3, 1])
@@ -951,6 +1034,21 @@ with tab_docs:
                     st.success("✅ Clean Knowledge Base: Zero contradictions detected across indexed documents!")
                 else:
                     st.warning(f"⚠️ Detected {len(active_conflicts)} active policy conflict(s) across your documents:")
+                    # B3: Dispatch webhook for proactive scan results
+                    try:
+                        from audit import _dispatch_webhook
+                        from datetime import datetime as _dt
+                        _dispatch_webhook({
+                            "timestamp": _dt.now().isoformat(),
+                            "query": "[PROACTIVE_SCAN]",
+                            "conflicts_detected": [
+                                {"topic": c["topic"], "trusted": c["trusted"].citation,
+                                 "outdated": [o.citation for o in c.get("outdated", [])]}
+                                for c in active_conflicts
+                            ],
+                        })
+                    except Exception:
+                        pass
                     for c in active_conflicts:
                         st.markdown(f"""
 <div class="nx-conflict">
@@ -1094,6 +1192,37 @@ with tab_analytics:
             "Queries": [normal_queries, conflict_count, flagged]
         }).set_index("Category")
         st.bar_chart(resolution_counts, color="#ec4899")
+
+    st.divider()
+
+    # B1: Export Audit Log
+    if audit_entries:
+        import json as _json
+        import pandas as _pd
+        col_exp1, col_exp2, _ = st.columns([1, 1, 2])
+        with col_exp1:
+            st.download_button(
+                label="📥 Export as JSON",
+                data=_json.dumps(audit_entries, indent=2),
+                file_name="nexa_audit_log.json",
+                mime="application/json",
+                use_container_width=True,
+            )
+        with col_exp2:
+            _df = _pd.DataFrame([{
+                "timestamp": e.get("timestamp", ""),
+                "query": e.get("query", ""),
+                "answer": e.get("answer", "")[:300],
+                "conflicts": len(e.get("conflicts_detected", [])),
+                "citations": len(e.get("citations", [])),
+            } for e in audit_entries])
+            st.download_button(
+                label="📊 Export as CSV",
+                data=_df.to_csv(index=False),
+                file_name="nexa_audit_log.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
 
     st.divider()
 
