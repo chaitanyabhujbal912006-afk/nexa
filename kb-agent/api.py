@@ -83,6 +83,7 @@ class ConflictModel(BaseModel):
 class QueryRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=2000)
     top_k: int = Field(5, ge=1, le=20)
+    history: Optional[List[dict]] = Field(None, description="Optional conversation turn history for multi-turn retrieval context")
 
     @field_validator("query")
     @classmethod
@@ -98,6 +99,8 @@ class QueryResponse(BaseModel):
     answer: str
     conflicts_detected: List[ConflictModel]
     citations: List[CitationModel]
+    confidence_level: str
+    total_chunks_retrieved: int
     provider: str
 
 
@@ -125,9 +128,9 @@ def health_check():
 
 @app.post("/api/v1/query", response_model=QueryResponse, dependencies=[Depends(require_api_key)])
 def query_knowledge_base(req: QueryRequest):
-    """Query the knowledge base. Requires X-API-Key header if NEXA_API_KEY is set."""
+    """Query the knowledge base with optional conversation history context."""
     try:
-        hits = retrieve(req.query, top_k=req.top_k)
+        hits = retrieve(req.query, top_k=req.top_k, history=req.history)
         conflicts = detect_conflicts(hits)
         answer, _ = generate_answer(req.query, hits, conflicts, llm_call_fn=get_llm_fn())
 
@@ -150,11 +153,16 @@ def query_knowledge_base(req: QueryRequest):
             for c in conflicts
         ]
 
+        avg_dist = (sum(h.distance for h in hits) / len(hits)) if hits else 1.0
+        conf_level = "HIGH" if avg_dist <= 0.30 else ("MEDIUM" if avg_dist <= 0.55 else "LOW")
+
         return QueryResponse(
             query=req.query,
             answer=answer,
             conflicts_detected=conflict_objs,
             citations=citation_objs,
+            confidence_level=conf_level,
+            total_chunks_retrieved=len(hits),
             provider=get_active_provider(),
         )
     except HTTPException:
