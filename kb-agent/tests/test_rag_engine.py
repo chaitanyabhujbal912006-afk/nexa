@@ -80,3 +80,11 @@ def test_contextualize_query():
     assert "Acme" in enriched or "refund" in enriched
     assert "restocking fee" in enriched
 
+
+def test_get_document_chunks():
+    from rag_engine import get_document_chunks
+    chunks = get_document_chunks("non_existent_file.pdf")
+    assert isinstance(chunks, list)
+    assert len(chunks) == 0
+
+

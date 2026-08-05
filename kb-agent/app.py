@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import streamlit as st
 
-from rag_engine import retrieve, detect_conflicts, generate_answer, delete_document_from_index, scan_all_conflicts
+from rag_engine import retrieve, detect_conflicts, generate_answer, delete_document_from_index, scan_all_conflicts, get_document_chunks
 from llm_config import load_secrets, get_active_provider, get_llm_fn
 
 st.set_page_config(
@@ -668,6 +668,7 @@ def run_ingestion_with_spinner():
         with st.spinner("🔄 Re-indexing knowledge base..."):
             import ingest
             ingest.main()
+            st.cache_data.clear()
         return True
     except Exception as e:
         st.error(f"Ingestion failed: {e}")
@@ -1028,10 +1029,23 @@ with tab_docs:
                         try:
                             if os.path.exists(doc["path"]):
                                 os.remove(doc["path"])
+                            st.cache_data.clear()
                             st.success(f"Deleted `{doc['name']}` ({chunks_deleted} vector chunks removed).")
                             st.rerun()
                         except Exception as err:
                             st.error(f"Failed to delete file: {err}")
+
+                with st.expander(f"👁 Inspect Indexed Chunks ({doc['name']})"):
+                    chunks = get_document_chunks(doc["name"])
+                    if not chunks:
+                        st.caption("No vector chunks found in ChromaDB for this document.")
+                    else:
+                        st.markdown(f"**{len(chunks)} Chunk(s) Indexed in ChromaDB:**")
+                        for ch in chunks:
+                            st.markdown(
+                                f"- **Section:** `{ch['section']}` | **Topic:** `{ch['topic']}` | **Date:** `{ch['doc_date']}`\n"
+                                f"  ```text\n  {ch['text'][:250]}...\n  ```"
+                            )
 
                 st.divider()
 

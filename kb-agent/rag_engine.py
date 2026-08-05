@@ -72,6 +72,23 @@ def delete_document_from_index(source_name: str) -> int:
     return 0
 
 
+def get_document_chunks(source_name: str) -> list:
+    """Retrieves all vector chunks and metadata for a given source_name from ChromaDB."""
+    collection = _load_collection()
+    res = collection.get(where={"source_name": source_name})
+    chunks = []
+    if res and res.get("documents"):
+        for doc, meta in zip(res["documents"], res["metadatas"]):
+            chunks.append({
+                "text": doc,
+                "section": meta.get("section", "N/A"),
+                "topic": meta.get("topic", "N/A"),
+                "doc_date": meta.get("doc_date", "N/A"),
+                "chunk_id": meta.get("chunk_id", 0)
+            })
+    return sorted(chunks, key=lambda c: c["chunk_id"])
+
+
 def contextualize_query(query: str, history: list = None) -> str:
     """
     Enriches follow-up queries with entity/topic keywords from recent conversation history.
