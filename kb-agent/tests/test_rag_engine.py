@@ -67,3 +67,16 @@ def test_build_context_block_formatting():
     block = build_context_block([hit], [])
     assert "RETRIEVED SOURCES:" in block
     assert "[1] (doc.pdf (pdf) — Sec 1, dated 2024-01-01)" in block
+
+
+def test_contextualize_query():
+    from rag_engine import contextualize_query
+    history = [
+        {"role": "user", "content": "What is the refund policy for Acme Corp?"},
+        {"role": "assistant", "content": "Acme Corp has a 15-day refund window."}
+    ]
+    follow_up = "Is there a restocking fee for it?"
+    enriched = contextualize_query(follow_up, history)
+    assert "Acme" in enriched or "refund" in enriched
+    assert "restocking fee" in enriched
+

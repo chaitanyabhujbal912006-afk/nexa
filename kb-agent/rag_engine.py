@@ -72,14 +72,53 @@ def delete_document_from_index(source_name: str) -> int:
     return 0
 
 
-def retrieve(query, top_k=5, fetch_k=12, max_distance=0.75):
+def contextualize_query(query: str, history: list = None) -> str:
+    """
+    Enriches follow-up queries with entity/topic keywords from recent conversation history.
+    Example:
+      Turn 1 user: 'What is our refund policy for Acme Corp?'
+      Turn 2 user: 'Is there a restocking fee?' -> Enriched: 'Acme Corp refund policy Is there a restocking fee?'
+    """
+    if not history:
+        return query
+
+    user_msgs = []
+    for h in history:
+        if isinstance(h, dict) and h.get("role") == "user":
+            user_msgs.append(h.get("content", ""))
+        elif isinstance(h, tuple) and len(h) >= 1:
+            user_msgs.append(h[0])
+
+    if not user_msgs:
+        return query
+
+    recent_context = " ".join(user_msgs[-2:])
+    clean_q = query.strip().lower()
+    follow_up_triggers = ["it", "this", "that", "they", "fee", "more", "what about", "how about", "same", "the", "and"]
+    is_short = len(query.split()) <= 6
+    has_trigger = any(re.search(r"\b" + re.escape(t) + r"\b", clean_q) for t in follow_up_triggers)
+
+    if is_short or has_trigger:
+        keywords = re.findall(r"\b[A-Z][a-zA-Z0-9_-]+\b", recent_context)
+        topic_words = re.findall(r"\b(refund|payment|policy|warranty|acme|beta|gamma|delta|alpha)\b", recent_context.lower())
+        extra = " ".join(dict.fromkeys(keywords + topic_words))
+        if extra:
+            return f"{extra} {query}"
+        return f"{recent_context[:120]} {query}"
+
+    return query
+
+
+def retrieve(query, top_k=5, fetch_k=12, max_distance=0.75, history=None):
     """
     Retrieves `fetch_k` nearest chunks, applies cosine distance threshold filtering (max_distance),
     keeps chunks matching dominant top topics, and caps at top_k.
+    If `history` is provided, contextualizes follow-up queries prior to embedding.
     """
+    effective_query = contextualize_query(query, history) if history else query
     collection = _load_collection()
     model = get_model()
-    query_vec = model.encode([query]).tolist()
+    query_vec = model.encode([effective_query]).tolist()
     results = collection.query(query_embeddings=query_vec, n_results=fetch_k)
 
     hits = []
@@ -87,9 +126,19 @@ def retrieve(query, top_k=5, fetch_k=12, max_distance=0.75):
         for doc, meta, dist in zip(
             results["documents"][0], results["metadatas"][0], results["distances"][0]
         ):
-            # Apply relevance distance threshold filtering
             if dist <= max_distance:
                 hits.append(RetrievalResult(doc, meta, dist))
+
+    # Fallback to raw query if enriched query returned 0 hits
+    if not hits and effective_query != query:
+        query_vec = model.encode([query]).tolist()
+        results = collection.query(query_embeddings=query_vec, n_results=fetch_k)
+        if results and results.get("documents") and results["documents"][0]:
+            for doc, meta, dist in zip(
+                results["documents"][0], results["metadatas"][0], results["distances"][0]
+            ):
+                if dist <= max_distance:
+                    hits.append(RetrievalResult(doc, meta, dist))
 
     if not hits:
         return []

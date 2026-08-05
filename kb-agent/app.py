@@ -867,10 +867,10 @@ with tab_copilot:
 
         with st.chat_message("assistant"):
             with st.spinner("Scanning knowledge base..."):
-                hits = retrieve(query, top_k=5)
+                prior_history = st.session_state.history[:-1]  # exclude current user msg
+                hits = retrieve(query, top_k=5, history=prior_history)
                 conflicts = detect_conflicts(hits)
-                # Multi-turn memory: inject prior conversation context into the user prompt
-                history_ctx = _build_history_context(st.session_state.history[:-1])  # exclude current user msg
+                history_ctx = _build_history_context(prior_history)
                 from rag_engine import build_context_block, SYSTEM_PROMPT
                 context_block = build_context_block(hits, conflicts)
                 augmented_prompt = f"{history_ctx}QUESTION: {query}\n\n{context_block}" if history_ctx else f"QUESTION: {query}\n\n{context_block}"
