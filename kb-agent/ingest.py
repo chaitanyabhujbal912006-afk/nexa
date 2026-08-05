@@ -340,12 +340,17 @@ def main():
 
     collection.add(documents=all_docs, metadatas=all_metas, ids=all_ids,
                     embeddings=embeddings)
-    print(f"\nIngested {len(all_docs)} chunks from "
-          f"{len(glob.glob(os.path.join(DATA_DIR, '**/*'), recursive=True))} files.")
-    print("Breakdown:", {
-        t: sum(1 for m in all_metas if m["source_type"] == t)
-        for t in {"email", "pdf", "excel"}
-    })
+    summary = {
+        "status": "success",
+        "total_chunks": len(all_docs),
+        "breakdown": {
+            t: sum(1 for m in all_metas if m["source_type"] == t)
+            for t in {"email", "pdf", "excel"}
+        },
+        "source_files": sorted(list({m["source_name"] for m in all_metas}))
+    }
+    print(f"\nIngested {len(all_docs)} chunks from {len(summary['source_files'])} distinct files.")
+    return summary
 
 
 if __name__ == "__main__":

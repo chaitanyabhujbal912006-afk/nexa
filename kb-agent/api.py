@@ -195,18 +195,22 @@ def trigger_ingestion():
 
 @app.get("/api/v1/documents", dependencies=[Depends(require_api_key)])
 def list_documents():
-    """List all ingested documents with metadata."""
+    """List all ingested documents with metadata and chunk counts."""
     base_dir = os.path.dirname(__file__)
     data_dir = os.path.join(base_dir, "data")
-    
+    from rag_engine import get_document_chunks
+
     docs = []
     for path in glob.glob(os.path.join(data_dir, "pdf_src", "*.pdf")):
-        docs.append({"name": os.path.basename(path), "type": "pdf", "size_bytes": os.path.getsize(path)})
+        name = os.path.basename(path)
+        docs.append({"name": name, "type": "pdf", "size_bytes": os.path.getsize(path), "chunks": len(get_document_chunks(name))})
     for path in glob.glob(os.path.join(data_dir, "*.xlsx")):
-        docs.append({"name": os.path.basename(path), "type": "excel", "size_bytes": os.path.getsize(path)})
+        name = os.path.basename(path)
+        docs.append({"name": name, "type": "excel", "size_bytes": os.path.getsize(path), "chunks": len(get_document_chunks(name))})
     for path in glob.glob(os.path.join(data_dir, "emails", "*.*")):
-        docs.append({"name": os.path.basename(path), "type": "email", "size_bytes": os.path.getsize(path)})
-        
+        name = os.path.basename(path)
+        docs.append({"name": name, "type": "email", "size_bytes": os.path.getsize(path), "chunks": len(get_document_chunks(name))})
+
     return {"total_count": len(docs), "documents": docs}
 
 
