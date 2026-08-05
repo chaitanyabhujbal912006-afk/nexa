@@ -943,15 +943,26 @@ with tab_copilot:
             except Exception:
                 pass
 
-            # Flag button — stable key based on history length at time of response
+            # Action toolbar (Convert to CRM Ticket & Flag)
             msg_index = len(st.session_state.history)
-            if st.button("⚑ Flag as Incorrect", key=f"flag-{msg_index}"):
-                try:
-                    from audit import log_qa_event
-                    log_qa_event(f"[FLAGGED] {query}", answer, hits, conflicts)
-                except Exception:
-                    pass
-                st.warning("Flagged and logged for review.")
+            col_act1, col_act2 = st.columns([1, 1])
+            with col_act1:
+                if st.button("⚡ Convert to CRM Ticket", key=f"crm_conv_{msg_index}", type="primary", use_container_width=True):
+                    st.session_state.last_context = {
+                        "query": query, "answer": answer,
+                        "hits": [{"text": h.text, "citation": h.citation} for h in hits],
+                        "conflicts": [{"topic": c["topic"], "trusted": c["trusted"].citation} for c in conflicts],
+                    }
+                    st.session_state.crm_notice = True
+                    st.success("✓ Copilot response transferred to CRM Ticket Studio! Switch to the ◈ CRM STUDIO tab to finalize.")
+            with col_act2:
+                if st.button("⚑ Flag as Incorrect", key=f"flag-{msg_index}", use_container_width=True):
+                    try:
+                        from audit import log_qa_event
+                        log_qa_event(f"[FLAGGED] {query}", answer, hits, conflicts)
+                    except Exception:
+                        pass
+                    st.warning("Flagged and logged for audit review.")
 
             st.session_state.history.append({"role": "assistant", "content": answer})
             st.session_state.last_context = {
@@ -1067,7 +1078,13 @@ with tab_crm:
     st.markdown('<div class="nx-section-label">CRM Support Ticket Generator</div>', unsafe_allow_html=True)
     st.caption("Auto-populate customer support tickets from Nexa's cited answers.")
 
+    if st.session_state.get("crm_notice"):
+        st.success("⚡ Active Context Transferred from AI Copilot — Ticket pre-populated below.")
+        st.session_state.crm_notice = False
+
     ctx = st.session_state.last_context
+    if ctx:
+        st.info(f"📌 **Active Ticket Source Context:** \"{ctx['query']}\" ({len(ctx['hits'])} cited document sources)")
     col1, col2 = st.columns(2)
 
     with col1:
