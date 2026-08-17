@@ -577,6 +577,14 @@ def _get_dynamic_suggestions():
         return None
 
 
+def _match_score(distance) -> int:
+    """Convert cosine distance into a 0-100% similarity match score."""
+    if distance is None:
+        return 0
+    sim = max(0.0, min(1.0, 1.0 - float(distance)))
+    return int(sim * 100)
+
+
 def _confidence_label(hits):
     """Map average retrieval distance to a human-readable confidence label and colour."""
     if not hits:
@@ -834,19 +842,33 @@ tab_copilot, tab_docs, tab_crm, tab_analytics = st.tabs([
 # ── TAB 1: COPILOT ────────────────────────────────────────────────────────────
 with tab_copilot:
 
-    # Suggested queries — dynamic from indexed topics, fallback to defaults
-    _dynamic = _get_dynamic_suggestions()
-    EXAMPLES = _dynamic if _dynamic else [
-        "What is our refund policy for bulk orders quoted to Acme Corp?",
-        "What payment terms apply to Beta LLC orders now?",
-        "What's the current warranty period for hardware products?",
-    ]
-    st.markdown('<div class="nx-section-label">Suggested Queries</div>', unsafe_allow_html=True)
-    cols = st.columns(len(EXAMPLES))
-    for i, (col, ex) in enumerate(zip(cols, EXAMPLES)):
-        with col:
-            if st.button(ex, use_container_width=True, key=f"suggestion-{i}"):
-                st.session_state.pending_query = ex
+    # Suggested queries — categorized & dynamic
+    st.markdown('<div class="nx-section-label">Explore Suggested Queries</div>', unsafe_allow_html=True)
+    cat_refund, cat_terms, cat_warranty = st.tabs(["💳 Refund & Policy", "📋 Terms & Pricing", "🛡️ Warranty & Service"])
+    with cat_refund:
+        col_r1, col_r2 = st.columns(2)
+        with col_r1:
+            if st.button("What is our refund policy for bulk orders quoted to Acme Corp?", use_container_width=True, key="sug_refund_1"):
+                st.session_state.pending_query = "What is our refund policy for bulk orders quoted to Acme Corp?"
+        with col_r2:
+            if st.button("Are restocking fees waived on returned non-bulk items?", use_container_width=True, key="sug_refund_2"):
+                st.session_state.pending_query = "Are restocking fees waived on returned non-bulk items?"
+    with cat_terms:
+        col_t1, col_t2 = st.columns(2)
+        with col_t1:
+            if st.button("What payment terms apply to Beta LLC orders now?", use_container_width=True, key="sug_terms_1"):
+                st.session_state.pending_query = "What payment terms apply to Beta LLC orders now?"
+        with col_t2:
+            if st.button("What are the updated client payment terms effective 2025?", use_container_width=True, key="sug_terms_2"):
+                st.session_state.pending_query = "What are the updated client payment terms effective 2025?"
+    with cat_warranty:
+        col_w1, col_w2 = st.columns(2)
+        with col_w1:
+            if st.button("What's the current warranty period for hardware products?", use_container_width=True, key="sug_war_1"):
+                st.session_state.pending_query = "What's the current warranty period for hardware products?"
+        with col_w2:
+            if st.button("How are warranty claims processed for defective units?", use_container_width=True, key="sug_war_2"):
+                st.session_state.pending_query = "How are warranty claims processed for defective units?"
 
     st.write("")
 
@@ -854,6 +876,38 @@ with tab_copilot:
     for msg in st.session_state.history:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
+
+    if st.session_state.history:
+        st.markdown('<div class="nx-section-label">Session Actions</div>', unsafe_allow_html=True)
+        col_exp_md, col_exp_json, col_clear = st.columns([1, 1, 1])
+        with col_exp_md:
+            md_text = f"# Nexa AI Copilot Chat Transcript\nGenerated: {datetime.now():%Y-%m-%d %H:%M:%S}\n\n"
+            for m in st.session_state.history:
+                role = "Employee" if m["role"] == "user" else "Nexa AI"
+                md_text += f"### {role}\n{m['content']}\n\n"
+            st.download_button(
+                "📥 Export Chat (.md)",
+                data=md_text,
+                file_name=f"nexa_chat_{int(datetime.now().timestamp())}.md",
+                mime="text/markdown",
+                use_container_width=True,
+                key="export_chat_md"
+            )
+        with col_exp_json:
+            import json as _json
+            st.download_button(
+                "📊 Export Chat (.json)",
+                data=_json.dumps(st.session_state.history, indent=2),
+                file_name=f"nexa_chat_{int(datetime.now().timestamp())}.json",
+                mime="application/json",
+                use_container_width=True,
+                key="export_chat_json"
+            )
+        with col_clear:
+            if st.button("🗑 Clear Session", use_container_width=True, key="copilot_clear_chat"):
+                st.session_state.history = []
+                st.session_state.last_context = None
+                st.rerun()
 
     # Chat input
     query = st.chat_input("Query your knowledge base...")
@@ -924,7 +978,7 @@ with tab_copilot:
                     unique_hits.append(h)
 
             pills_html = "".join(
-                f'<span class="nx-pill {pill_class(h)}">{pill_icon(h)} {html.escape(h.metadata.get("source_name","?"))} · {h.metadata.get("doc_date","?")}</span>'
+                f'<span class="nx-pill {pill_class(h)}">{pill_icon(h)} {html.escape(h.metadata.get("source_name","?"))} · {h.metadata.get("doc_date","?")} <span style="font-size:0.62rem;opacity:0.85;margin-left:4px;padding:1px 6px;background:rgba(0,0,0,0.3);border-radius:100px;">{_match_score(h.distance)}% match</span></span>'
                 for h in unique_hits
             )
             st.markdown(
@@ -933,9 +987,13 @@ with tab_copilot:
                 unsafe_allow_html=True,
             )
 
-            # Context inspector
-            with st.expander("◈  Inspect Retrieved Context"):
-                st.code(context_block, language="markdown")
+            # Context inspector with relevance scores
+            with st.expander("◈  Inspect Retrieved Context & Relevance Metrics"):
+                for idx, h in enumerate(hits, 1):
+                    st.markdown(f"**[{idx}] {h.citation}** &nbsp;•&nbsp; **Match Score:** `{_match_score(h.distance)}%` (`cosine distance: {round(h.distance, 4)}`)")
+                    st.code(h.text, language="markdown")
+                if conflicts:
+                    st.warning("⚠️ Conflict Detected across dated sources above!")
 
             # Audit log
             try:
@@ -1035,17 +1093,42 @@ with tab_docs:
                         except Exception as err:
                             st.error(f"Failed to delete file: {err}")
 
-                with st.expander(f"👁 Inspect Indexed Chunks ({doc['name']})"):
-                    chunks = get_document_chunks(doc["name"])
-                    if not chunks:
-                        st.caption("No vector chunks found in ChromaDB for this document.")
-                    else:
-                        st.markdown(f"**{len(chunks)} Chunk(s) Indexed in ChromaDB:**")
-                        for ch in chunks:
-                            st.markdown(
-                                f"- **Section:** `{ch['section']}` | **Topic:** `{ch['topic']}` | **Date:** `{ch['doc_date']}`\n"
-                                f"  ```text\n  {ch['text'][:250]}...\n  ```"
-                            )
+                col_exp1, col_exp2 = st.columns(2)
+                with col_exp1:
+                    with st.expander(f"📖 File Text Preview ({doc['name']})"):
+                        try:
+                            if doc["name"].endswith(".pdf"):
+                                from pypdf import PdfReader
+                                rdr = PdfReader(doc["path"])
+                                p_text = "\n".join(p.extract_text() or "" for p in rdr.pages[:3])
+                                st.text_area("PDF Text Sample", value=p_text[:1200], height=140, disabled=True, key=f"txtprev_{idx}_{doc['name']}")
+                            elif doc["name"].endswith(".xlsx"):
+                                import pandas as pd
+                                xl = pd.ExcelFile(doc["path"])
+                                st.caption(f"Sheets: `{', '.join(xl.sheet_names)}`")
+                                df_s = pd.read_excel(xl, sheet_name=xl.sheet_names[0])
+                                st.dataframe(df_s.head(4), use_container_width=True)
+                            else:
+                                with open(doc["path"], "r", encoding="utf-8", errors="ignore") as f:
+                                    txt_s = f.read()[:1200]
+                                st.text_area("Raw Content Sample", value=txt_s, height=140, disabled=True, key=f"txtprev_{idx}_{doc['name']}")
+                        except Exception as p_err:
+                            st.caption(f"Preview unavailable: {p_err}")
+
+                with col_exp2:
+                    with st.expander(f"👁 Vector Chunks ({doc['name']})"):
+                        chunks = get_document_chunks(doc["name"])
+                        if not chunks:
+                            st.caption("No vector chunks found in ChromaDB.")
+                        else:
+                            st.markdown(f"**{len(chunks)} Chunk(s) Indexed:**")
+                            for ch in chunks[:5]:
+                                st.markdown(
+                                    f"- `{ch['section']}` | Topic: `{ch['topic']}` | Date: `{ch['doc_date']}`\n"
+                                    f"  ```text\n  {ch['text'][:180]}...\n  ```"
+                                )
+                            if len(chunks) > 5:
+                                st.caption(f"... +{len(chunks)-5} more chunks in ChromaDB")
 
                 st.divider()
 
