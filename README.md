@@ -6,7 +6,7 @@
 ![Nexa](https://img.shields.io/badge/Nexa-v2.0-7c3aed?style=for-the-badge&logo=lightning)
 ![License](https://img.shields.io/badge/License-MIT-6366f1?style=for-the-badge)
 ![LLM](https://img.shields.io/badge/LLM-Groq%20%7C%20Gemini-ec4899?style=for-the-badge)
-![Tests](https://img.shields.io/badge/Tests-8%20Passed-34d399?style=for-the-badge)
+![Tests](https://img.shields.io/badge/Tests-38%20Passed-34d399?style=for-the-badge)
 ![CI](https://img.shields.io/github/actions/workflow/status/chaitanyabhujbal912006-afk/nexa/ci.yml?style=for-the-badge&label=CI)
 
 ---
@@ -40,15 +40,16 @@ Citations:
 
 | Feature | Detail |
 |---|---|
-| **Multi-Format Ingestion** | PDF (+ OCR fallback), multi-sheet `.xlsx`, `.txt`, `.eml` |
-| **Semantic Vector Search** | `all-MiniLM-L6-v2` (384-dim) via ChromaDB |
-| **Conflict Detection Engine** | Detects numeric AND qualitative policy contradictions, trusts latest date |
+| **Multi-Format Ingestion** | PDF (+ OCR fallback), multi-sheet `.xlsx`, `.csv`, `.txt`, `.eml` with safe encoding fallbacks |
+| **Robust Date Parsing** | Normalizes 15+ real-world date formats (ordinals, dotted ISO, ISO timestamps, email headers) |
+| **Semantic Vector Search** | `all-MiniLM-L6-v2` (384-dim) via ChromaDB with sentence-boundary chunking |
+| **Conflict Detection Engine** | Detects numeric AND qualitative policy contradictions (Net terms, warranty durations, return windows) |
 | **Dual LLM Support** | Gemini Flash (primary) → Groq llama-3.3-70b (secondary) → Demo mode |
-| **Cyberpunk UI** | Dark neon Streamlit app with Orbitron/JetBrains Mono typography |
+| **Cyberpunk Accessible UI** | Dark neon Streamlit app with WCAG 2.1 AA/AAA High Contrast, Large Text, and Reduced Motion toggles |
 | **CRM Ticket Studio** | Auto-populate support tickets from cited answers |
-| **FastAPI REST Backend** | `/api/v1/query`, `/api/v1/health`, `/api/v1/ingest` |
+| **FastAPI REST Backend** | `/api/v1/query`, `/api/v1/health`, `/api/v1/conflicts`, `/api/v1/ingest` |
 | **Audit Trail** | Persistent JSONL logging of every Q&A turn |
-| **Pytest Test Suite** | 8 tests covering date extraction, conflict detection, and context building |
+| **Pytest Test Suite** | 38 tests covering date extraction, conflict detection, REST API, and real-world benchmark cases |
 | **Docker Ready** | `Dockerfile` + `docker-compose.yml` for one-command deployment |
 | **GitHub Actions CI** | Auto-runs tests on every `git push` |
 
@@ -58,15 +59,15 @@ Citations:
 
 ```
 data/pdf_src/*.pdf   ─┐
-data/*.xlsx          ─┼─► ingest.py ──► SentenceTransformers ──► ChromaDB
+data/*.xlsx, *.csv   ─┼─► ingest.py ──► SentenceTransformers ──► ChromaDB
 data/emails/*.eml    ─┘         (topic, doc_date, section, source_type)
                                               │
 Question ──► app.py (Streamlit UI)            │
           ──► api.py (FastAPI REST)  ──► rag_engine.retrieve()
-                                          ──► detect_conflicts()
-                                          ──► generate_answer()
-                                              │
-                               Gemini Flash / Groq ──► Cited Answer + Audit Log
+                                           ──► detect_conflicts()
+                                           ──► generate_answer()
+                                               │
+                                Gemini Flash / Groq ──► Cited Answer + Audit Log
 ```
 
 ---
@@ -191,7 +192,7 @@ Full interactive API docs at **http://localhost:8000/docs** (Swagger UI auto-gen
 ```bash
 cd kb-agent
 pytest tests/
-# 8 passed ✅
+# 38 passed ✅
 ```
 
 CI runs automatically on every `git push` via GitHub Actions.

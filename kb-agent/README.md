@@ -16,12 +16,13 @@ Nexa is 100% mobile-responsive. Users can add Nexa to their iPhone (Safari) or A
 
 ## Directory Structure
 
-- `app.py`: Streamlit frontend with glassmorphism UI, Copilot chat, CRM ticket studio, and Analytics/Audit viewer.
-- `ingest.py`: Multi-format document parser (PDF + OCR, Excel multi-sheet, email .txt & .eml) and `SentenceTransformer` embedder.
-- `rag_engine.py`: Vector retrieval engine, date extractor, and conflict resolution detector.
+- `app.py`: Streamlit frontend with glassmorphism UI, WCAG 2.1 AA/AAA accessibility suite (High Contrast, Large Text, Reduced Motion toggles), Copilot chat, CRM ticket studio, and Analytics/Audit viewer.
+- `ingest.py`: Multi-format document parser (PDF + OCR, Excel multi-sheet, CSV, email .txt & .eml with safe multi-encoding fallback), 15+ date format normalizer, and `SentenceTransformer` embedder.
+- `rag_engine.py`: Vector retrieval engine, date extractor, and quantitative/qualitative conflict resolution detector.
 - `audit.py`: Persistent audit logging module (`data/audit_log.jsonl`).
 - `requirements.txt`: Python package dependencies.
-- `data/`: Knowledge base source files (`pdf_src/`, `emails/`, `.xlsx` spreadsheets).
+- `data/`: Knowledge base source files (`pdf_src/`, `emails/`, `.xlsx`, `.csv`).
+- `tests/`: 38 automated Pytest test cases (`test_api.py`, `test_ingest_dates.py`, `test_rag_engine.py`, `test_real_world_cases.py`).
 
 ## Running locally
 
@@ -29,4 +30,11 @@ Nexa is 100% mobile-responsive. Users can add Nexa to their iPhone (Safari) or A
 pip install -r requirements.txt
 python ingest.py
 streamlit run app.py
+```
+
+## Running tests
+
+```bash
+pytest tests/
+# 38 passed ✅
 ```
