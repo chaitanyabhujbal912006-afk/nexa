@@ -1,50 +1,39 @@
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
 @import "tailwindcss";
 
 @layer base {
   :root {
     --font-inter: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    --font-geist: 'Geist', 'Space Grotesk', sans-serif;
-    --font-space: 'Space Grotesk', sans-serif;
-    --font-mono: 'Geist', 'Fira Code', monospace;
+    --font-geist: 'Geist', 'Inter', sans-serif;
 
-    /* Obsidian Kinetic Color Palette */
-    --obsidian-bg: #0c1324;
-    --obsidian-surface: #151b2d;
-    --obsidian-container: #191f31;
-    --obsidian-container-high: #23293c;
-    --obsidian-container-highest: #2e3447;
-    --obsidian-border: #424754;
-    --obsidian-primary: #adc6ff;
-    --obsidian-secondary: #c0c1ff;
-    --obsidian-tertiary: #4cd7f6;
-    --obsidian-on-surface: #dce1fb;
-
-    /* Glassmorphism Theme Variables */
-    --glass-bg: rgba(12, 19, 36, 0.65);
-    --glass-card: rgba(25, 31, 49, 0.7);
-    --glass-card-hover: rgba(35, 41, 60, 0.85);
-    --glass-border: rgba(66, 71, 84, 0.6);
-    --glass-border-glow: rgba(173, 198, 255, 0.4);
-
-    --color-primary: #adc6ff;
-    --color-primary-hover: #4d8eff;
-    --color-accent: #4cd7f6;
-    --color-amber: #f59e0b;
-    --color-rose: #ffb4ab;
+    /* NEXA Color System */
+    --surface: #0c1324;
+    --on-surface: #dce1fb;
+    --on-surface-variant: #c2c6d6;
+    --primary: #adc6ff;
+    --primary-container: #4d8eff;
+    --secondary: #c0c1ff;
+    --tertiary: #4cd7f6;
+    --outline: #8c909f;
+    --outline-variant: #424754;
+    --surface-container-low: #151b2d;
+    --surface-container: #191f31;
+    --surface-container-high: #23293c;
+    --surface-container-highest: #2e3447;
+    --surface-container-lowest: #070d1f;
   }
 }
 
 body {
-  background-color: var(--obsidian-bg);
-  color: var(--obsidian-on-surface);
+  background-color: #0c1324;
+  color: #dce1fb;
   font-family: var(--font-inter);
   min-height: 100vh;
   overflow-x: hidden;
 }
 
-/* Material Symbols Class */
+/* Material Symbols Icon Class */
 .material-symbols-outlined {
   font-family: 'Material Symbols Outlined';
   font-weight: normal;
@@ -60,89 +49,79 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Glassmorphism Panels */
+/* Glassmorphic Utilities */
 .glass-panel {
-  background: var(--glass-bg);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  background: rgba(12, 19, 36, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(140, 144, 159, 0.2);
 }
 
 .glass-card {
-  background: var(--glass-card);
+  background: rgba(25, 31, 49, 0.7);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
+  border: 1px solid rgba(66, 71, 84, 0.6);
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .glass-card:hover {
-  background: var(--glass-card-hover);
-  border-color: var(--glass-border-glow);
+  background: rgba(35, 41, 60, 0.85);
+  border-color: rgba(173, 198, 255, 0.4);
   transform: translateY(-2px);
   box-shadow: 0 12px 32px rgba(77, 142, 255, 0.15);
 }
 
-.glass-button {
-  background: rgba(77, 142, 255, 0.15);
-  border: 1px solid rgba(173, 198, 255, 0.3);
-  color: #d8e2ff;
-  backdrop-filter: blur(12px);
-  transition: all 0.2s ease;
-}
-
-.glass-button:hover {
-  background: rgba(77, 142, 255, 0.3);
-  border-color: rgba(173, 198, 255, 0.6);
-  color: #ffffff;
-  box-shadow: 0 0 20px rgba(77, 142, 255, 0.3);
-}
-
-.glass-input {
-  background: rgba(12, 19, 36, 0.7);
-  border: 1px solid rgba(66, 71, 84, 0.8);
-  backdrop-filter: blur(12px);
-  color: #dce1fb;
-  transition: all 0.2s ease;
-}
-
-.glass-input:focus {
-  border-color: rgba(173, 198, 255, 0.8);
-  box-shadow: 0 0 24px rgba(77, 142, 255, 0.25);
-  outline: none;
-}
-
-/* Technical Accent Lines & Glowing Borders */
-.kinetic-border {
+.glow-active {
   position: relative;
 }
-.kinetic-border::after {
+
+.glow-active::after {
   content: '';
   position: absolute;
-  inset: 0;
+  inset: -4px;
   border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(135deg, rgba(173, 198, 255, 0.5), transparent 60%, rgba(76, 215, 246, 0.3));
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
+  background: radial-gradient(circle at center, rgba(173, 198, 255, 0.15) 0%, transparent 70%);
+  z-index: -1;
   pointer-events: none;
 }
 
-/* Neon & Text Gradients */
 .gradient-text {
-  background: linear-gradient(135deg, #ffffff 0%, #adc6ff 50%, #4cd7f6 100%);
+  background: linear-gradient(to right, #adc6ff, #4d8eff);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-.neon-glow {
-  box-shadow: 0 0 25px rgba(77, 142, 255, 0.35);
+.btn-primary {
+  background: linear-gradient(to right, #4d8eff, #3131c0);
+  color: #dce1fb;
+  border: none;
 }
 
-.neon-glow-cyan {
-  box-shadow: 0 0 25px rgba(76, 215, 246, 0.35);
+.btn-ghost {
+  background: transparent;
+  border: 1px solid #3131c0;
+  color: #adc6ff;
+}
+
+.float-animation {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+.data-pulse {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.5; }
+  50% { opacity: 1; }
+  100% { opacity: 0.5; }
 }
 
 /* Custom Scrollbar */
@@ -161,12 +140,3 @@ body {
   background: rgba(173, 198, 255, 0.5);
 }
 
-/* Animations */
-@keyframes pulse-slow {
-  0%, 100% { opacity: 0.4; transform: scale(1); }
-  50% { opacity: 0.8; transform: scale(1.05); }
-}
-
-.animate-pulse-slow {
-  animation: pulse-slow 4s ease-in-out infinite;
-}
