@@ -181,17 +181,23 @@ def detect_conflicts(hits):
         by_topic.setdefault(topic, []).append(h)
 
     def key_facts(text):
-        """Extract numeric 'facts' ($ amounts, %, day counts) AND qualitative policy terms
-        (non-refundable, no fee, all sales final, store credit) so conflict detection catches
-        both quantitative and qualitative policy contradictions."""
+        """Extract numeric facts ($ amounts, %, day/month/hour counts, Net terms) AND qualitative policy terms
+        (discontinued, non-refundable, no fee, early payment, restocking fee, store credit) so conflict
+        detection catches both quantitative and qualitative policy contradictions in real documents."""
         low = text.lower()
-        raw = re.findall(r"\d+%|\$\d+(?:\.\d+)?|\d+[- ]?day", low)
-        facts = {re.sub(r"[- ]", "", f) for f in raw}
+        # Extract numbers, currency, percentages, payment terms, time windows
+        raw = re.findall(
+            r"\d+%\b|\$\d+(?:\.\d+)?\b|net\s*\d+\b|\d+\s*(?:day|month|year|hour|business hour|min)s?\b",
+            low
+        )
+        facts = {re.sub(r"\s+", "", f) for f in raw}
 
         qualitative_signals = [
             "non-refundable", "non refundable", "refundable", "no fee",
             "all sales final", "store credit", "full refund", "no refund",
-            "restocking fee waived", "returns accepted", "no returns"
+            "restocking fee", "discontinued", "supersedes", "early payment discount",
+            "late fee", "late payment fee", "waived", "pre-approved",
+            "returns accepted", "no returns"
         ]
         for sig in qualitative_signals:
             if sig in low:
@@ -212,7 +218,7 @@ def detect_conflicts(hits):
             continue
         trusted_facts = key_facts(trusted.text)
         if all(key_facts(o.text) == trusted_facts for o in outdated):
-            continue  # same numbers -> not an actual conflict, just corroboration
+            continue  # same numbers/facts -> not an actual conflict, just corroboration
         conflicts.append({
             "topic": topic,
             "trusted": trusted,

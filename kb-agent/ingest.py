@@ -30,40 +30,77 @@ import email.utils
 DATE_PATTERNS = [
     re.compile(r"\b(\d{4}-\d{2}-\d{2})\b"),                             # 2024-11-03
     re.compile(r"\b(\d{4}/\d{2}/\d{2})\b"),                             # 2024/11/03
-    re.compile(r"\b(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})\b", re.I), # 3 Nov 2024 / 3 November 2024
-    re.compile(r"\b((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4})\b", re.I), # Nov 3, 2024 / November 3, 2024
+    re.compile(r"\b(\d{4}\.\d{2}\.\d{2})\b"),                             # 2024.11.03
+    re.compile(r"\b(\d{1,2}[/-]\d{1,2}[/-]\d{4})\b"),                   # 11-03-2024 / 11/03/2024
+    re.compile(r"\b(\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z.]*\s+\d{4})\b", re.I), # 3rd Nov 2024 / 3 November 2024 / 3rd Jan. 2025
+    re.compile(r"\b((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z.]*\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4})\b", re.I), # Nov 3rd, 2024 / November 3, 2024 / Jan. 15, 2024
 ]
 
 
+def read_file_text_safe(path):
+    """Safely read text file using multiple encoding fallbacks."""
+    for enc in ("utf-8", "utf-8-sig", "cp1252", "latin-1"):
+        try:
+            with open(path, "r", encoding=enc) as f:
+                return f.read()
+        except (UnicodeDecodeError, Exception):
+            continue
+    with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        return f.read()
+
+
 def parse_date_string(date_str):
-    """Normalize various date formats into standard YYYY-MM-DD string."""
-    if not date_str:
+    """Normalize various date formats (strings, timestamps, datetimes) into standard YYYY-MM-DD string."""
+    if not date_str or pd.isna(date_str):
         return None
 
+    # Handle pandas / python datetime or Timestamp objects
+    if isinstance(date_str, (datetime, pd.Timestamp)):
+        return date_str.strftime("%Y-%m-%d")
+
+    s_val = str(date_str).strip()
+    if not s_val:
+        return None
+
+    # Handle ISO timestamp format e.g. 2024-11-03T14:22:00Z or 2024-11-03 14:22:00
+    iso_match = re.match(r"^(\d{4}-\d{2}-\d{2})[T\s]", s_val)
+    if iso_match:
+        return iso_match.group(1)
+
     # Handle PDF metadata format e.g. D:20241201120000Z
-    pdf_match = re.match(r"D:(\d{4})(\d{2})(\d{2})", str(date_str))
+    pdf_match = re.match(r"D:(\d{4})(\d{2})(\d{2})", s_val)
     if pdf_match:
         return f"{pdf_match.group(1)}-{pdf_match.group(2)}-{pdf_match.group(3)}"
 
     # Try email header rfc2822
     try:
-        dt = email.utils.parsedate_to_datetime(str(date_str))
+        dt = email.utils.parsedate_to_datetime(s_val)
         if dt:
             return dt.strftime("%Y-%m-%d")
     except Exception:
         pass
 
-    # Try regex patterns
+    # Strip ordinal suffixes (1st -> 1, 2nd -> 2, 3rd -> 3, 4th -> 4) and dots in month names
+    cleaned_val = re.sub(r"(\d+)(st|nd|rd|th)\b", r"\1", s_val, flags=re.I)
+    cleaned_val = re.sub(r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.", r"\1", cleaned_val, flags=re.I)
+
+    # Try regex patterns on cleaned value
     for pat in DATE_PATTERNS:
-        m = pat.search(str(date_str))
+        m = pat.search(cleaned_val)
         if m:
             raw = m.group(1)
-            for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%d %b %Y", "%d %B %Y", "%b %d, %Y", "%B %d, %Y", "%b %d %Y", "%B %d %Y"):
+            raw_clean = re.sub(r"(\d+)(st|nd|rd|th)\b", r"\1", raw, flags=re.I).replace(",", "").replace(".", "").strip()
+            for fmt in (
+                "%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d",
+                "%d %b %Y", "%d %B %Y", "%b %d %Y", "%B %d %Y",
+                "%m-%d-%Y", "%m/%d/%Y", "%d-%m-%Y", "%d/%m/%Y"
+            ):
                 try:
-                    return datetime.strptime(raw.replace(",", ""), fmt).strftime("%Y-%m-%d")
+                    return datetime.strptime(raw_clean, fmt).strftime("%Y-%m-%d")
                 except ValueError:
                     continue
-            return raw  # fallback if already YYYY-MM-DD
+            if re.match(r"^\d{4}-\d{2}-\d{2}$", raw):
+                return raw
 
     return None
 
@@ -121,16 +158,29 @@ def extract_pdf_date(reader, full_text, fname=""):
     return "unknown"
 
 
-def chunk_text(text, chunk_size=350, overlap=50):
-    """Simple word-based chunking with overlap, good enough for prose."""
-    words = text.split()
+def chunk_text(text, chunk_size=150, overlap=30):
+    """Sentence-boundary aware chunking with overlap to preserve semantic context."""
+    if not text or not text.strip():
+        return []
+
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
     chunks = []
-    i = 0
-    while i < len(words):
-        chunk = " ".join(words[i:i + chunk_size])
-        if chunk.strip():
-            chunks.append(chunk)
-        i += chunk_size - overlap
+    current_words = []
+
+    for sent in sentences:
+        words = sent.split()
+        if not words:
+            continue
+        if len(current_words) + len(words) <= chunk_size:
+            current_words.extend(words)
+        else:
+            if current_words:
+                chunks.append(" ".join(current_words))
+            overlap_words = current_words[-overlap:] if len(current_words) >= overlap else current_words
+            current_words = overlap_words + words
+
+    if current_words:
+        chunks.append(" ".join(current_words))
     return chunks
 
 
@@ -139,14 +189,14 @@ def sanitize_topic(text):
     clean = re.sub(r"[^a-zA-Z0-9\s_]", "", str(text)).strip().lower()
     clean = re.sub(r"\s+", "_", clean)
     return clean[:40] if clean else "general"
+    return clean[:40] if clean else "general"
 
 
 def ingest_emails():
     """Each email is prose -> chunked, date pulled from headers/body/filename."""
     docs, metas, ids = [], [], []
     for path in glob.glob(os.path.join(DATA_DIR, "emails", "*.txt")):
-        with open(path, "r", encoding="utf-8") as f:
-            content = f.read()
+        content = read_file_text_safe(path)
 
         fname = os.path.basename(path)
         doc_date = extract_email_date(content, fname)
@@ -288,7 +338,7 @@ def ingest_excel():
                     row_date = "unknown"
                     for d_key in ("Order Date", "Date", "Effective Date", "Created At", "Timestamp"):
                         if d_key in row and pd.notna(row[d_key]):
-                            row_date = parse_date_string(str(row[d_key])) or str(row[d_key])
+                            row_date = parse_date_string(row[d_key]) or str(row[d_key])
                             break
 
                     client_val = str(row.get("Client", "general"))
@@ -309,6 +359,57 @@ def ingest_excel():
     return docs, metas, ids
 
 
+def ingest_csv():
+    """Each row in a CSV file -> turned into natural-language sentence record."""
+    docs, metas, ids = [], [], []
+    csv_paths = glob.glob(os.path.join(DATA_DIR, "*.csv")) + glob.glob(os.path.join(DATA_DIR, "csv", "*.csv"))
+    for path in csv_paths:
+        fname = os.path.basename(path)
+        try:
+            df = None
+            for enc in ("utf-8", "utf-8-sig", "cp1252", "latin-1"):
+                try:
+                    df = pd.read_csv(path, encoding=enc)
+                    break
+                except Exception:
+                    continue
+            if df is None or df.empty:
+                continue
+
+            topic = sanitize_topic(fname.replace(".csv", ""))
+
+            for row_idx, row in df.iterrows():
+                parts = []
+                for col in df.columns:
+                    val = row[col]
+                    if pd.notna(val):
+                        parts.append(f"{col}: {val}")
+                row_text = ", ".join(parts)
+                sentence = f"CSV record from '{fname}' (Row {row_idx + 2}): {row_text}."
+
+                row_date = "unknown"
+                for d_key in ("Order Date", "Date", "Effective Date", "Created At", "Timestamp"):
+                    if d_key in row and pd.notna(row[d_key]):
+                        row_date = parse_date_string(row[d_key]) or str(row[d_key])
+                        break
+
+                client_val = str(row.get("Client", "general"))
+
+                docs.append(sentence)
+                metas.append({
+                    "source_type": "csv",
+                    "source_name": fname,
+                    "doc_date": row_date,
+                    "section": f"Row {row_idx + 2}",
+                    "topic": topic,
+                    "client": client_val,
+                })
+                ids.append(f"csv-{fname}-{row_idx}")
+        except Exception as err:
+            print(f"Warning: Failed to parse CSV file {fname}: {err}")
+    return docs, metas, ids
+
+
 def main():
     print(f"Loading embedding model '{EMBED_MODEL}'...")
     model = SentenceTransformer(EMBED_MODEL)
@@ -324,7 +425,7 @@ def main():
     )
 
     all_docs, all_metas, all_ids = [], [], []
-    for fn in (ingest_emails, ingest_eml, ingest_pdfs, ingest_excel):
+    for fn in (ingest_emails, ingest_eml, ingest_pdfs, ingest_excel, ingest_csv):
         d, m, i = fn()
         all_docs += d
         all_metas += m
@@ -345,7 +446,7 @@ def main():
         "total_chunks": len(all_docs),
         "breakdown": {
             t: sum(1 for m in all_metas if m["source_type"] == t)
-            for t in {"email", "pdf", "excel"}
+            for t in {"email", "pdf", "excel", "csv"}
         },
         "source_files": sorted(list({m["source_name"] for m in all_metas}))
     }
@@ -355,3 +456,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
