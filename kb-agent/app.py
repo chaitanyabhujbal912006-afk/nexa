@@ -1,585 +1,441 @@
+"""
+Nexa — SME Knowledge Agent Engine (Streamlit Frontend v2.0)
+Lutra UI inspired design system + WCAG 2.1 AA/AAA accessibility.
+"""
+
 import os
 import sys
 import glob
 import html
-import subprocess
+import json
 import threading
 from datetime import datetime
 
-# Ensure kb-agent folder is on Python path regardless of execution root (e.g. Streamlit Cloud)
+# Ensure kb-agent folder is on Python path regardless of execution root
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import streamlit as st
+import pandas as pd
 
-from rag_engine import retrieve, detect_conflicts, generate_answer, delete_document_from_index, scan_all_conflicts, get_document_chunks
+from rag_engine import (
+    retrieve,
+    detect_conflicts,
+    generate_answer,
+    delete_document_from_index,
+    scan_all_conflicts,
+    get_document_chunks,
+    build_context_block,
+    SYSTEM_PROMPT,
+)
 from llm_config import load_secrets, get_active_provider, get_llm_fn
 
+# ── Streamlit Page Configuration ───────────────────────────────────────────────
 st.set_page_config(
     page_title="Nexa — SME Knowledge Agent",
-    page_icon="âš¡",
+    page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 load_secrets()
 
-# â”€â”€ Ingestion lock (shared with API server concept) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Concurrency Lock ──────────────────────────────────────────────────────────
 _ingest_lock = threading.Lock()
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# CSS —” Same cyberpunk theme, fully fixed
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â/* â”€â”€â”€ GLASSMORPHISM DESIGN SYSTEM â”€â”€â”€ */
+# ── LUTRA UI INSPIRED DESIGN SYSTEM (CSS) ──────────────────────────────────────
+st.markdown("""<style>
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&display=swap');
+
 :root {
-  --glass-bg: rgba(18, 10, 38, 0.45);
-  --glass-bg-hover: rgba(28, 15, 58, 0.65);
-  --glass-border: 1px solid rgba(255, 255, 255, 0.12);
-  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
-  --glass-blur: blur(18px) saturate(190%);
+  --lutra-hue: 245deg;
+  --lutra-primary: #6366f1;
+  --lutra-primary-hover: #4f46e5;
+  --lutra-accent: #10b981;
+  --lutra-amber: #f59e0b;
+  --lutra-rose: #f43f5e;
+  
+  --bg-dark: #090d16;
+  --bg-card: rgba(19, 27, 46, 0.75);
+  --bg-card-hover: rgba(27, 38, 64, 0.85);
+  --bg-sidebar: rgba(13, 19, 33, 0.95);
+  
+  --border-subtle: 1px solid rgba(255, 255, 255, 0.08);
+  --border-glow: 1px solid rgba(99, 102, 241, 0.35);
+  --border-amber: 1px solid rgba(245, 158, 11, 0.4);
+  
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --text-subtle: #64748b;
+  
+  --shadow-main: 0 12px 32px 0 rgba(0, 0, 0, 0.45);
+  --glass-blur: blur(20px) saturate(180%);
 }
 
-/* â”€â”€â”€ HERO GLASS CARD â”€â”€â”€ */
+/* Global Reset & Body Background */
+.stApp {
+    background: radial-gradient(circle at 50% 0%, #151d33 0%, #090d16 70%) !important;
+    font-family: 'Inter', sans-serif !important;
+    color: var(--text-main) !important;
+}
+
+/* High Contrast Mode */
+.stApp.high-contrast {
+    background: #000000 !important;
+    color: #ffffff !important;
+}
+.stApp.high-contrast * {
+    border-color: #ffffff !important;
+}
+
+/* Large Text Mode */
+.stApp.large-text p, .stApp.large-text span, .stApp.large-text div {
+    font-size: 1.1rem !important;
+}
+
+/* Reduced Motion Mode */
+.stApp.reduced-motion * {
+    animation: none !important;
+    transition: none !important;
+}
+
+/* Hide Default Header Decoration */
+header[data-testid="stHeader"] {
+    background: transparent !important;
+}
+
+/* ── HERO BANNER ───────────────────────────────────────────────────────────── */
 .nx-hero {
-    position: relative; overflow: hidden;
-    background: linear-gradient(135deg, rgba(124,58,237,0.18) 0%, rgba(99,102,241,0.12) 50%, rgba(236,72,153,0.1) 100%) !important;
-    border: var(--glass-border) !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.22) !important;
-    border-radius: 24px !important;
-    padding: 36px 48px !important;
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(16, 185, 129, 0.08) 50%, rgba(244, 63, 94, 0.06) 100%) !important;
+    border: var(--border-glow) !important;
+    border-radius: 20px !important;
+    padding: 32px 40px !important;
     margin-bottom: 24px !important;
     backdrop-filter: var(--glass-blur) !important;
-    box-shadow: var(--glass-shadow), 0 0 40px rgba(124,58,237,0.15) !important;
+    box-shadow: var(--shadow-main), 0 0 40px rgba(99, 102, 241, 0.12) !important;
 }
-.nx-hero::before {
-    content: '';
-    position: absolute; inset: 0;
-    background: repeating-linear-gradient(0deg, transparent, transparent 40px, rgba(124,58,237,0.025) 40px, rgba(124,58,237,0.025) 41px),
-                repeating-linear-gradient(90deg, transparent, transparent 80px, rgba(124,58,237,0.015) 80px, rgba(124,58,237,0.015) 81px);
-    border-radius: 24px; pointer-events: none;
+.nx-hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(99, 102, 241, 0.2) !important;
+    border: 1px solid rgba(129, 140, 248, 0.4) !important;
+    color: #a5b4fc;
+    padding: 4px 12px;
+    border-radius: 100px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-family: 'Fira Code', monospace !important;
+    margin-bottom: 12px;
 }
-.nx-hero::after {
-    content: '';
-    position: absolute; top: -40%; right: -10%;
-    width: 350px; height: 350px;
-    background: radial-gradient(circle, rgba(124,58,237,0.22) 0%, transparent 70%);
-    pointer-events: none;
-    animation: pulse-orb 4s ease-in-out infinite;
+.nx-hero-badge .dot {
+    width: 6px;
+    height: 6px;
+    background: #a5b4fc;
+    border-radius: 50%;
+    animation: pulse-dot 1.5s infinite;
 }
-@keyframes pulse-orb {
-    0%, 100% { transform: scale(1); opacity: 0.5; }
-    50% { transform: scale(1.15); opacity: 0.9; }
-}
-.nx-badge {
-    display: inline-flex; align-items: center; gap: 8px;
-    background: rgba(124,58,237,0.22) !important;
-    border: 1px solid rgba(167,139,250,0.45) !important;
-    color: #c4b5fd;
-    padding: 5px 14px; border-radius: 100px;
-    font-size: 0.68rem; font-weight: 600; letter-spacing: 0.12em;
-    text-transform: uppercase; margin-bottom: 14px;
-    font-family: 'JetBrains Mono', monospace !important;
-    backdrop-filter: blur(10px) !important;
-}
-.nx-badge .dot {
-    width: 6px; height: 6px; background: #a78bfa;
-    border-radius: 50%; animation: blink 1.5s ease-in-out infinite;
-}
-@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+@keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
 .nx-hero h1 {
-    font-size: 2.6rem !important; font-weight: 900 !important; line-height: 1.1 !important;
-    background: linear-gradient(135deg, #ffffff 0%, #c4b5fd 45%, #ec4899 100%);
-    -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important;
-    background-clip: text !important;
-    margin-bottom: 10px !important; letter-spacing: -0.02em !important;
+    font-family: 'Space Grotesk', sans-serif !important;
+    font-size: 2.5rem !important;
+    font-weight: 700 !important;
+    background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #818cf8 100%);
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    margin: 0 0 10px 0 !important;
+    line-height: 1.1 !important;
 }
 .nx-hero p {
-    color: #94a3b8; font-size: 0.92rem; line-height: 1.7; max-width: 600px;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    max-width: 680px;
+    margin: 0;
 }
-.nx-provider-pill {
-    display: inline-flex; align-items: center; gap: 6px;
-    background: rgba(16,185,129,0.12) !important; border: 1px solid rgba(16,185,129,0.35) !important;
-    color: #34d399; padding: 4px 12px; border-radius: 100px;
-    font-size: 0.68rem; font-family: 'JetBrains Mono', monospace !important;
-    font-weight: 600; letter-spacing: 0.06em; margin-top: 14px;
-    backdrop-filter: blur(10px) !important;
+.nx-provider-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(16, 185, 129, 0.15) !important;
+    border: 1px solid rgba(16, 185, 129, 0.4) !important;
+    color: #34d399;
+    padding: 5px 14px;
+    border-radius: 100px;
+    font-size: 0.72rem;
+    font-family: 'Fira Code', monospace !important;
+    font-weight: 600;
+    margin-top: 16px;
 }
-.nx-provider-pill .live-dot {
-    width: 6px; height: 6px; background: #34d399; border-radius: 50%;
-    box-shadow: 0 0 6px #34d399; animation: blink 1.2s ease-in-out infinite;
+.nx-provider-status .live-dot {
+    width: 7px;
+    height: 7px;
+    background: #34d399;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #34d399;
 }
 
-/* â”€â”€â”€ BENTO STAT CARDS GLASS â”€â”€â”€ */
+/* ── BENTO METRIC CARDS ────────────────────────────────────────────────────── */
 .bento-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin: 16px 0;
 }
 .bento-card {
-    background: rgba(20, 10, 42, 0.45) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.2) !important;
-    border-radius: 16px !important; padding: 16px !important; text-align: center;
-    backdrop-filter: blur(14px) saturate(180%) !important;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08) !important;
-    transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    background: var(--bg-card) !important;
+    border: var(--border-subtle) !important;
+    border-radius: 14px !important;
+    padding: 16px !important;
+    text-align: center;
+    backdrop-filter: var(--glass-blur) !important;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 .bento-card:hover {
-    border-color: rgba(167,139,250,0.6) !important;
-    transform: translateY(-3px) scale(1.02) !important;
-    box-shadow: 0 12px 32px rgba(124,58,237,0.25), inset 0 1px 0 rgba(255,255,255,0.2) !important;
+    border-color: rgba(99, 102, 241, 0.5) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.2) !important;
 }
 .bento-card .num {
-    font-family: 'Orbitron', sans-serif !important;
-    font-size: 1.6rem; font-weight: 900; color: #a78bfa;
-    display: block; line-height: 1.1;
+    font-family: 'Space Grotesk', sans-serif !important;
+    font-size: 1.7rem;
+    font-weight: 700;
+    color: #818cf8;
+    display: block;
+    line-height: 1.1;
 }
 .bento-card .lbl {
-    font-size: 0.6rem; color: #64748b; text-transform: uppercase;
-    letter-spacing: 0.1em; font-weight: 600;
-    font-family: 'JetBrains Mono', monospace !important; margin-top: 4px;
+    font-size: 0.65rem;
+    color: var(--text-subtle);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 600;
+    font-family: 'Fira Code', monospace !important;
+    margin-top: 4px;
 }
 
-/* â”€â”€â”€ DOCUMENT BROWSER GLASS â”€â”€â”€ */
+/* ── SIDEBAR STYLING ───────────────────────────────────────────────────────── */
+[data-testid="stSidebar"] {
+    background-color: var(--bg-sidebar) !important;
+    border-right: var(--border-subtle) !important;
+}
 .doc-item {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 12px; border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    background: rgba(255, 255, 255, 0.03) !important;
-    backdrop-filter: blur(10px) !important;
-    margin-bottom: 7px; transition: all 0.22s ease;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    border: var(--border-subtle) !important;
+    background: rgba(255, 255, 255, 0.02) !important;
+    margin-bottom: 6px;
+    transition: all 0.2s ease;
 }
 .doc-item:hover {
-    border-color: rgba(167,139,250,0.45) !important;
-    background: rgba(124,58,237,0.15) !important;
-    transform: translateX(3px) !important;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.3) !important;
+    border-color: rgba(99, 102, 241, 0.4) !important;
+    background: rgba(99, 102, 241, 0.1) !important;
+    transform: translateX(2px);
 }
 .doc-icon { font-size: 1rem; flex-shrink: 0; }
 .doc-name {
-    font-size: 0.72rem; font-family: 'JetBrains Mono', monospace;
-    color: #c4b5fd !important; -webkit-text-fill-color: #c4b5fd !important;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
+    font-size: 0.75rem;
+    font-family: 'Fira Code', monospace;
+    color: #c7d2fe !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
 }
 .doc-date {
-    font-size: 0.6rem; color: #4b5563 !important; -webkit-text-fill-color: #4b5563 !important;
-    font-family: 'JetBrains Mono', monospace; flex-shrink: 0;
+    font-size: 0.65rem;
+    color: var(--text-subtle);
+    font-family: 'Fira Code', monospace;
 }
 
-/* â”€â”€â”€ TABS â”€â”€â”€ */
-[data-testid="stTabs"] button {
-    font-family: 'Orbitron', sans-serif !important;
-    font-size: 0.7rem !important; font-weight: 700 !important;
-    letter-spacing: 0.08em !important; text-transform: uppercase !important;
-    color: #64748b !important; border-radius: 10px 10px 0 0 !important;
-    padding: 10px 22px !important; transition: all 0.2s !important;
-}
-[data-testid="stTabs"] button[aria-selected="true"] {
-    color: #a78bfa !important;
-    border-bottom: 2px solid #7c3aed !important;
-    background: rgba(124,58,237,0.12) !important;
-    backdrop-filter: blur(12px) !important;
-}
-[data-testid="stTabs"] button:hover {
-    color: #c4b5fd !important; background: rgba(124,58,237,0.07) !important;
-}
-
-/* â”€â”€â”€ BUTTONS GLASS â”€â”€â”€ */
-[data-testid="stButton"] > button {
-    background: rgba(20, 10, 42, 0.45) !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.2) !important;
-    color: #c4b5fd !important; -webkit-text-fill-color: #c4b5fd !important;
-    border-radius: 14px !important;
-    font-family: 'Inter', sans-serif !important;
-    font-size: 0.82rem !important; font-weight: 500 !important;
-    padding: 10px 18px !important; transition: all 0.22s ease !important; cursor: pointer !important;
-    backdrop-filter: blur(14px) !important;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.3) !important;
-}
-[data-testid="stButton"] > button:hover {
-    background: rgba(124,58,237,0.28) !important;
-    border-color: rgba(167,139,250,0.6) !important;
-    color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;
-    box-shadow: 0 6px 24px rgba(124,58,237,0.35) !important;
-    transform: translateY(-2px) !important;
-}
-[data-testid="stButton"] > button[kind="primary"],
-[data-testid="stButton"] > button[data-testid="baseButton-primary"] {
-    background: linear-gradient(135deg, #7c3aed, #6366f1) !important;
-    border: 1px solid rgba(255, 255, 255, 0.25) !important;
-    color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;
-    box-shadow: 0 6px 24px rgba(124,58,237,0.45) !important;
-}
-[data-testid="stButton"] > button[kind="primary"]:hover {
-    box-shadow: 0 8px 32px rgba(124,58,237,0.65) !important;
-    transform: translateY(-2px) !important;
-}
-
-/* â”€â”€â”€ CHAT INPUT GLASS â”€â”€â”€ */
-[data-testid="stChatInput"] { background: transparent !important; border: none !important; padding: 0 !important; }
-[data-testid="stChatInput"] > div {
-    background: rgba(14, 6, 32, 0.65) !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.25) !important;
-    border-radius: 18px !important; backdrop-filter: blur(18px) saturate(190%) !important;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.1) !important;
-    overflow: hidden !important;
-}
-[data-testid="stChatInput"] textarea,
-[data-testid="stChatInputTextArea"] textarea,
-[data-testid="stChatInput"] [data-baseweb="textarea"] textarea {
-    background: transparent !important; border: none !important;
-    color: #e2d9f3 !important; -webkit-text-fill-color: #e2d9f3 !important;
-    caret-color: #a78bfa !important;
-    font-family: 'Inter', sans-serif !important; font-size: 0.92rem !important;
-    padding: 12px 16px !important; box-shadow: none !important;
-}
-[data-testid="stChatInput"] textarea::placeholder,
-[data-testid="stChatInputTextArea"] textarea::placeholder {
-    color: rgba(148,130,200,0.4) !important;
-    -webkit-text-fill-color: rgba(148,130,200,0.4) !important;
-}
-[data-testid="stChatInput"] button {
-    background: linear-gradient(135deg, #7c3aed, #ec4899) !important;
-    border-radius: 10px !important; border: none !important;
-    color: #ffffff !important; margin-right: 6px !important;
-}
-
-/* â”€â”€â”€ FILE UPLOADER GLASS â”€â”€â”€ */
-[data-testid="stFileUploader"] { background: transparent !important; border: none !important; padding: 0 !important; }
-[data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] {
-    background: rgba(124,58,237,0.06) !important;
-    border: 1px dashed rgba(167,139,250,0.35) !important;
-    border-radius: 14px !important; padding: 14px !important; color: #c4b5fd !important;
-    backdrop-filter: blur(10px) !important;
-}
-[data-testid="stFileUploaderDropzone"] span { display: none !important; }
-[data-testid="stFileUploaderDropzone"] button span { display: inline !important; }
-[data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] button {
-    background: rgba(124,58,237,0.22) !important;
-    border: 1px solid rgba(167,139,250,0.45) !important;
-    border-radius: 8px !important; color: #e2d9f3 !important;
-    -webkit-text-fill-color: #e2d9f3 !important;
-    padding: 6px 14px !important; font-size: 0.78rem !important;
-}
-[data-testid="stFileUploader"] small {
-    color: #a78bfa !important; font-size: 0.68rem !important;
-}
-
-/* â”€â”€â”€ ALL INPUTS / TEXTAREAS / SELECTS GLASS â”€â”€â”€ */
-[data-testid="stTextInput"] > div,
-[data-testid="stTextArea"] > div,
-[data-testid="stSelectbox"] > div,
-[data-baseweb="input"],
-[data-baseweb="base-input"],
-[data-baseweb="textarea"],
-[data-baseweb="select"] > div,
-[data-baseweb="select"] > div > div {
-    background-color: rgba(14, 6, 30, 0.65) !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.18) !important;
-    border-radius: 14px !important;
-    color: #e2d9f3 !important; -webkit-text-fill-color: #e2d9f3 !important;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.35) !important;
-    backdrop-filter: blur(14px) !important;
-    transition: all 0.22s ease !important;
-}
-[data-testid="stTextInput"] input,
-[data-testid="stTextArea"] textarea,
-[data-baseweb="input"] input,
-[data-baseweb="base-input"] input,
-[data-baseweb="textarea"] textarea,
-textarea {
-    background-color: transparent !important; background: transparent !important;
-    color: #e2d9f3 !important; -webkit-text-fill-color: #e2d9f3 !important;
-    caret-color: #a78bfa !important;
-    font-family: 'Inter', sans-serif !important; font-size: 0.92rem !important;
-    border: none !important; box-shadow: none !important;
-}
-[data-testid="stTextInput"] input::placeholder,
-[data-testid="stTextArea"] textarea::placeholder,
-textarea::placeholder {
-    color: rgba(148,130,200,0.4) !important;
-    -webkit-text-fill-color: rgba(148,130,200,0.4) !important;
-}
-[data-testid="stTextInput"] > div:focus-within,
-[data-testid="stTextArea"] > div:focus-within,
-[data-baseweb="input"]:focus-within,
-[data-baseweb="textarea"]:focus-within {
-    border-color: rgba(167,139,250,0.7) !important;
-    box-shadow: 0 0 0 3px rgba(124,58,237,0.22), 0 0 24px rgba(124,58,237,0.25) !important;
-    background-color: rgba(22,10,45,0.85) !important;
-}
-[data-testid="stSelectbox"] [data-baseweb="select"] span,
-[data-testid="stSelectbox"] [data-baseweb="select"] div,
-[data-baseweb="select"] span {
-    color: #e2d9f3 !important; -webkit-text-fill-color: #e2d9f3 !important;
-    background: transparent !important;
-}
-[data-testid="stSelectbox"] svg { fill: #a78bfa !important; }
-
-/* Dropdown menu */
-[data-baseweb="popover"], [data-baseweb="menu"], ul[data-baseweb="menu"] {
-    background-color: rgba(10, 3, 24, 0.92) !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
-    border-radius: 14px !important; box-shadow: 0 12px 36px rgba(0,0,0,0.85) !important;
-    backdrop-filter: blur(20px) !important;
-}
-li[data-baseweb="option"] {
-    background-color: transparent !important;
-    color: #cbd5e1 !important; -webkit-text-fill-color: #cbd5e1 !important;
-    font-family: 'Inter', sans-serif !important;
-}
-li[data-baseweb="option"]:hover,
-li[data-baseweb="option"][aria-selected="true"] {
-    background-color: rgba(124,58,237,0.32) !important;
-    color: #a78bfa !important; -webkit-text-fill-color: #a78bfa !important;
-}
-
-/* Widget labels */
-[data-testid="stWidgetLabel"] > p,
-[data-testid="stWidgetLabel"] label {
-    color: #6b7280 !important; -webkit-text-fill-color: #6b7280 !important;
-    font-size: 0.72rem !important; font-family: 'JetBrains Mono', monospace !important;
-    text-transform: uppercase !important; letter-spacing: 0.08em !important;
-}
-
-/* â”€â”€â”€ CHAT MESSAGES GLASS â”€â”€â”€ */
+/* ── CHAT MESSAGES & CONTAINERS ───────────────────────────────────────────── */
 [data-testid="stChatMessage"] {
-    background: transparent !important; border: none !important;
-    color: #e2d9f3 !important; -webkit-text-fill-color: #e2d9f3 !important;
+    background: transparent !important;
+    border: none !important;
+    color: var(--text-main) !important;
 }
 [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
-    background: rgba(124,58,237,0.12) !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.2) !important;
-    backdrop-filter: blur(14px) !important;
-    border-radius: 18px !important; padding: 14px 18px !important; margin: 10px 0 !important;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.35) !important;
+    background: rgba(99, 102, 241, 0.12) !important;
+    border: var(--border-subtle) !important;
+    border-radius: 16px !important;
+    padding: 16px 20px !important;
+    margin: 12px 0 !important;
+    backdrop-filter: var(--glass-blur) !important;
 }
-[data-testid="stChatMessage"] p,
-[data-testid="stChatMessage"] span,
-[data-testid="stChatMessage"] div {
-    color: #e2d9f3 !important; -webkit-text-fill-color: #e2d9f3 !important;
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) {
+    background: rgba(19, 27, 46, 0.8) !important;
+    border: var(--border-subtle) !important;
+    border-radius: 16px !important;
+    padding: 18px 22px !important;
+    margin: 12px 0 !important;
+    backdrop-filter: var(--glass-blur) !important;
+    box-shadow: var(--shadow-main) !important;
 }
 
-/* â”€â”€â”€ CONFLICT BOX GLASS â”€â”€â”€ */
+/* ── CONFLICT BANNER ───────────────────────────────────────────────────────── */
 .nx-conflict {
-    background: linear-gradient(135deg, rgba(236,72,153,0.08) 0%, rgba(251,146,60,0.05) 100%) !important;
-    border: 1px solid rgba(236,72,153,0.45) !important; border-left: 4px solid #ec4899 !important;
-    border-radius: 18px !important; padding: 18px 22px !important; margin: 14px 0 !important;
-    backdrop-filter: blur(16px) !important;
-    box-shadow: 0 8px 28px rgba(236,72,153,0.15) !important;
-    position: relative; overflow: hidden;
-}
-.nx-conflict::before {
-    content: 'âš  CONFLICT';
-    position: absolute; top: 10px; right: 14px;
-    font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
-    font-weight: 700; letter-spacing: 0.12em; color: #ec4899;
-    background: rgba(236,72,153,0.12); padding: 3px 8px;
-    border-radius: 100px; border: 1px solid rgba(236,72,153,0.35);
+    background: rgba(245, 158, 11, 0.08) !important;
+    border: var(--border-amber) !important;
+    border-radius: 14px !important;
+    padding: 16px 20px !important;
+    margin: 14px 0 !important;
+    backdrop-filter: blur(12px) !important;
 }
 .nx-conflict-title {
-    font-family: 'Orbitron', sans-serif; font-size: 0.82rem; font-weight: 700;
-    color: #f9a8d4; margin-bottom: 8px; padding-right: 80px;
+    color: #fbbf24;
+    font-weight: 700;
+    font-size: 0.85rem;
+    font-family: 'Fira Code', monospace;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
-.nx-conflict-row { display: flex; align-items: flex-start; gap: 10px; margin: 6px 0; font-size: 0.82rem; color: #cbd5e1; line-height: 1.5; }
-.nx-conflict-tag {
-    font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; font-weight: 700;
-    padding: 2px 8px; border-radius: 100px; white-space: nowrap; flex-shrink: 0;
+.nx-conflict-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.8rem;
+    color: #e2e8f0;
+    margin-top: 6px;
 }
-.nx-conflict-tag.trusted { background: rgba(52,211,153,0.12); color: #34d399; border: 1px solid rgba(52,211,153,0.35); }
-.nx-conflict-tag.outdated { background: rgba(236,72,153,0.12); color: #f9a8d4; border: 1px solid rgba(236,72,153,0.35); }
-
-/* â”€â”€â”€ ANSWER BOX GLASS â”€â”€â”€ */
-.nx-answer-header {
-    display: flex; align-items: center; gap: 10px;
-    background: linear-gradient(135deg, rgba(124,58,237,0.25), rgba(99,102,241,0.12)) !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important; border-bottom: none !important;
-    border-radius: 18px 18px 0 0 !important; padding: 12px 20px !important; margin-top: 14px !important;
-    backdrop-filter: blur(16px) !important;
+.nx-tag {
+    font-size: 0.62rem;
+    font-family: 'Fira Code', monospace;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 100px;
+    letter-spacing: 0.08em;
 }
-.nx-answer-header-text {
-    font-family: 'Orbitron', sans-serif; font-size: 0.68rem; font-weight: 700;
-    letter-spacing: 0.12em; color: #a78bfa; text-transform: uppercase;
+.nx-tag.trusted {
+    background: rgba(16, 185, 129, 0.2);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.4);
 }
-.nx-answer {
-    background: rgba(10, 4, 24, 0.65) !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
-    border-top: 3px solid #7c3aed !important;
-    border-radius: 0 0 18px 18px !important;
-    padding: 22px 26px !important; margin: 0 0 16px 0 !important;
-    font-size: 0.94rem; line-height: 1.8; color: #e2d9f3;
-    backdrop-filter: blur(20px) saturate(190%) !important;
-    box-shadow: 0 12px 36px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08) !important;
-}
-.nx-answer p, .nx-answer span, .nx-answer div {
-    color: #e2d9f3 !important; -webkit-text-fill-color: #e2d9f3 !important;
-}
-
-/* â”€â”€â”€ SECTION LABEL â”€â”€â”€ */
-.nx-section-label {
-    font-family: 'Orbitron', sans-serif; font-size: 0.62rem; font-weight: 700;
-    letter-spacing: 0.18em; color: #64748b; text-transform: uppercase;
-    margin-bottom: 10px; margin-top: 4px;
-    display: flex; align-items: center; gap: 10px;
-}
-.nx-section-label::after {
-    content: ''; flex: 1; height: 1px;
-    background: linear-gradient(90deg, rgba(124,58,237,0.35), transparent);
+.nx-tag.outdated {
+    background: rgba(244, 63, 94, 0.2);
+    color: #fb7185;
+    border: 1px solid rgba(244, 63, 94, 0.4);
 }
 
-/* â”€â”€â”€ CITATION PILLS GLASS â”€â”€â”€ */
-.nx-citations { display: flex; flex-wrap: wrap; gap: 7px; margin: 12px 0; }
+/* ── CITATION PILLS ────────────────────────────────────────────────────────── */
+.nx-citations {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
 .nx-pill {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 5px 12px; border-radius: 100px; font-size: 0.7rem;
-    font-family: 'JetBrains Mono', monospace; font-weight: 500;
-    border: 1px solid; transition: all 0.22s ease;
-    backdrop-filter: blur(10px);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.04);
+    border: var(--border-subtle);
+    color: #cbd5e1;
+    padding: 5px 12px;
+    border-radius: 100px;
+    font-size: 0.72rem;
+    font-family: 'Fira Code', monospace;
+    transition: all 0.2s ease;
 }
-.nx-pill.pdf { background: rgba(99,102,241,0.12); border-color: rgba(99,102,241,0.38); color: #a5b4fc; }
-.nx-pill.email { background: rgba(234,179,8,0.1); border-color: rgba(234,179,8,0.35); color: #fde68a; }
-.nx-pill.excel { background: rgba(52,211,153,0.1); border-color: rgba(52,211,153,0.35); color: #6ee7b7; }
-.nx-pill:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
+.nx-pill:hover {
+    border-color: rgba(99, 102, 241, 0.5);
+    background: rgba(99, 102, 241, 0.15);
+}
+.nx-match-score {
+    font-size: 0.62rem;
+    background: rgba(0, 0, 0, 0.3);
+    color: #a5b4fc;
+    padding: 1px 7px;
+    border-radius: 100px;
+    font-weight: 600;
+}
 
-/* â”€â”€â”€ TICKET CARD GLASS â”€â”€â”€ */
-.nx-ticket {
-    background: rgba(52,211,153,0.06) !important; border: 1px solid rgba(52,211,153,0.3) !important;
-    border-radius: 18px; padding: 20px 24px; margin-top: 14px; position: relative;
-    backdrop-filter: blur(16px) !important;
-    box-shadow: 0 8px 28px rgba(0,0,0,0.35) !important;
+/* ── CUSTOM TAB STYLING ────────────────────────────────────────────────────── */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 8px !important;
+    background: transparent !important;
+    padding: 4px 0 !important;
+    border-bottom: var(--border-subtle) !important;
 }
-.nx-ticket-badge {
-    font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; font-weight: 700;
-    letter-spacing: 0.1em; color: #34d399; text-transform: uppercase;
-    background: rgba(52,211,153,0.12); border: 1px solid rgba(52,211,153,0.3);
-    padding: 3px 10px; border-radius: 100px; display: inline-block; margin-bottom: 8px;
+.stTabs [data-baseweb="tab"] {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: var(--border-subtle) !important;
+    border-radius: 12px 12px 0 0 !important;
+    color: var(--text-muted) !important;
+    font-family: 'Fira Code', monospace !important;
+    font-size: 0.78rem !important;
+    font-weight: 600 !important;
+    padding: 10px 20px !important;
+    transition: all 0.2s ease !important;
+}
+.stTabs [aria-selected="true"] {
+    background: rgba(99, 102, 241, 0.2) !important;
+    border-color: rgba(99, 102, 241, 0.5) !important;
+    color: #ffffff !important;
 }
 
-/* â”€â”€â”€ ANALYTICS GLASS â”€â”€â”€ */
-.nx-analytics {
-    background: rgba(14, 6, 32, 0.55); border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 18px; padding: 20px 24px; margin-bottom: 12px; backdrop-filter: blur(16px);
+/* ── BUTTON STYLING ────────────────────────────────────────────────────────── */
+.stButton > button {
+    border-radius: 10px !important;
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 600 !important;
+    transition: all 0.2s ease !important;
+    cursor: pointer !important;
 }
+.stButton > button[kind="primary"] {
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important;
+    border: none !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3) !important;
+}
+.stButton > button[kind="primary"]:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45) !important;
+}
+
+/* ── AUDIT LOG ENTRY CARD ─────────────────────────────────────────────────── */
 .nx-audit-entry {
-    padding: 14px 18px; border-radius: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(124,58,237,0.06); margin-bottom: 8px;
-    backdrop-filter: blur(12px); transition: all 0.22s;
+    background: rgba(19, 27, 46, 0.6);
+    border: var(--border-subtle);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 10px;
 }
-.nx-audit-entry:hover { border-color: rgba(167,139,250,0.45); background: rgba(124,58,237,0.12); transform: translateX(3px); }
 .nx-audit-time {
-    font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; color: #64748b;
-    -webkit-text-fill-color: #64748b !important; margin-bottom: 4px;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.68rem;
+    color: var(--text-subtle);
 }
 .nx-audit-query {
-    font-size: 0.85rem; color: #c4b5fd; -webkit-text-fill-color: #c4b5fd !important; font-weight: 500;
+    font-weight: 600;
+    color: #f1f5f9;
+    font-size: 0.88rem;
+    margin-top: 4px;
 }
-.nx-audit-conflict-tag {
-    display: inline-block; font-size: 0.6rem; font-family: 'JetBrains Mono', monospace;
-    background: rgba(236,72,153,0.12); color: #f9a8d4; border: 1px solid rgba(236,72,153,0.35);
-    padding: 2px 8px; border-radius: 100px; margin-top: 4px; font-weight: 700;
-}
+</style>""", unsafe_allow_html=True)
 
-/* â”€â”€â”€ METRIC GLASS CARDS â”€â”€â”€ */
-[data-testid="stMetric"] {
-    background: rgba(20, 10, 42, 0.45) !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.2) !important;
-    border-radius: 16px !important; padding: 16px !important;
-    backdrop-filter: blur(16px) !important;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.35) !important;
-}
-[data-testid="stMetricValue"] { font-family: 'Orbitron', sans-serif !important; color: #a78bfa !important; }
-[data-testid="stMetricLabel"] {
-    color: #64748b !important; font-family: 'JetBrains Mono', monospace !important;
-    font-size: 0.68rem !important; text-transform: uppercase !important; letter-spacing: 0.08em !important;
-}
-
-/* â”€â”€â”€ EXPANDERS GLASS â”€â”€â”€ */
-[data-testid="stExpander"] {
-    background: rgba(18, 9, 38, 0.45) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    border-radius: 14px !important;
-    backdrop-filter: blur(14px) !important;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important;
-}
-[data-testid="stExpander"] summary { color: #94a3b8 !important; font-size: 0.8rem !important; font-family: 'JetBrains Mono', monospace !important; }
-[data-testid="stInfo"] { background: rgba(124,58,237,0.08) !important; border: 1px solid rgba(124,58,237,0.25) !important; border-radius: 14px !important; color: #c4b5fd !important; backdrop-filter: blur(12px) !important; }
-[data-testid="stSuccess"] { background: rgba(52,211,153,0.08) !important; border: 1px solid rgba(52,211,153,0.25) !important; border-radius: 14px !important; backdrop-filter: blur(12px) !important; }
-[data-testid="stWarning"] { background: rgba(251,146,60,0.08) !important; border: 1px solid rgba(251,146,60,0.25) !important; border-radius: 14px !important; backdrop-filter: blur(12px) !important; }
-[data-testid="stSpinner"] p { color: #a78bfa !important; font-family: 'JetBrains Mono', monospace !important; }
-pre, code { background: rgba(0,0,0,0.5) !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 10px !important; color: #c4b5fd !important; font-family: 'JetBrains Mono', monospace !important; }
-hr { border-color: rgba(255,255,255,0.08) !important; }
-.stCaption, [data-testid="stCaptionContainer"] { color: #64748b !important; font-family: 'JetBrains Mono', monospace !important; font-size: 0.7rem !important; }rder: 1px solid rgba(251,146,60,0.18) !important; border-radius: 12px !important; }
-[data-testid="stSpinner"] p { color: #a78bfa !important; font-family: 'JetBrains Mono', monospace !important; }
-pre, code { background: rgba(0,0,0,0.4) !important; border: 1px solid rgba(124,58,237,0.18) !important; border-radius: 8px !important; color: #c4b5fd !important; font-family: 'JetBrains Mono', monospace !important; }
-hr { border-color: rgba(124,58,237,0.12) !important; }
-.stCaption, [data-testid="stCaptionContainer"] { color: #374151 !important; font-family: 'JetBrains Mono', monospace !important; font-size: 0.7rem !important; }
-
-/* Scan-line overlay */
-body::after {
-    content: ''; position: fixed; inset: 0;
-    background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.03) 3px, rgba(0,0,0,0.03) 4px);
-    pointer-events: none; z-index: 9999;
-}
-
-/* â”€â”€â”€ RESPONSIVE â”€â”€â”€ */
-@media (max-width: 768px) {
-    .nx-hero { padding: 20px 18px !important; border-radius: 14px !important; }
-    .nx-hero h1 { font-size: 1.7rem !important; }
-    .bento-grid { grid-template-columns: 1fr !important; gap: 7px !important; }
-    .nx-suggestion-bar { flex-direction: column !important; }
-}
-</style>
-""", unsafe_allow_html=True)
-
-
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# Helpers
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
+# ── HELPER FUNCTIONS ──────────────────────────────────────────────────────────
 BASE_DIR = os.path.dirname(__file__)
 DATA_DIR = os.path.join(BASE_DIR, "data")
-
 KNOWN_CLIENTS = ["acme", "beta", "gamma", "delta", "alpha"]
 
-
-@st.cache_data(ttl=120)
-def _get_dynamic_suggestions():
-    """Pull top 3 topic examples from the ChromaDB collection for dynamic suggestion chips."""
-    try:
-        import chromadb
-        client = chromadb.PersistentClient(path=os.path.join(BASE_DIR, "chroma_db"))
-        col = client.get_or_create_collection("sme_knowledge_base")
-        if col.count() == 0:
-            return None
-        sample = col.get(limit=200, include=["metadatas"])
-        topics = {}
-        for meta in sample.get("metadatas", []):
-            topic = meta.get("topic", "").replace("_", " ")
-            src = meta.get("source_name", "")
-            if topic and topic != "general" and src:
-                topics[topic] = src
-        # Return up to 3 unique topic phrases as example questions
-        candidates = sorted(topics.items())[:3]
-        return [f"Tell me about {t} in {s}" for t, s in candidates] if candidates else None
-    except Exception:
-        return None
-
-
 def _match_score(distance) -> int:
-    """Convert cosine distance into a 0-100% similarity match score."""
     if distance is None:
         return 0
     sim = max(0.0, min(1.0, 1.0 - float(distance)))
     return int(sim * 100)
 
-
 def _confidence_label(hits):
-    """Map average retrieval distance to a human-readable confidence label and colour."""
     if not hits:
-        return "N/A", "#4b5563"
+        return "N/A", "#64748b"
     avg = sum(h.distance for h in hits) / len(hits)
     if avg <= 0.30:
         return "HIGH", "#34d399"
@@ -587,9 +443,7 @@ def _confidence_label(hits):
         return "MEDIUM", "#fbbf24"
     return "LOW", "#f87171"
 
-
 def _build_history_context(history, max_turns=3):
-    """Build a formatted prior-turn context block from session history (last max_turns pairs)."""
     pairs = []
     i = 0
     while i < len(history) - 1:
@@ -607,61 +461,44 @@ def _build_history_context(history, max_turns=3):
         lines.append(f"Assistant: {a[:500]}\n")
     return "\n".join(lines) + "\n\n"
 
-
 def count_docs():
     pdfs = glob.glob(os.path.join(DATA_DIR, "pdf_src", "*.pdf"))
     sheets = glob.glob(os.path.join(DATA_DIR, "*.xlsx"))
     emails = glob.glob(os.path.join(DATA_DIR, "emails", "*.*"))
-    return len(pdfs), len(sheets), len(emails)
+    csvs = glob.glob(os.path.join(DATA_DIR, "*.csv")) + glob.glob(os.path.join(DATA_DIR, "csv", "*.csv"))
+    return len(pdfs), len(sheets), len(emails), len(csvs)
 
+def _hint_date(fname):
+    import re
+    m = re.search(r"(\d{4}-\d{2}-\d{2})", fname)
+    return m.group(1) if m else "—"
 
 def get_all_documents():
-    """Return structured document objects for the document browser and management tab."""
     docs = []
     for p in sorted(glob.glob(os.path.join(DATA_DIR, "pdf_src", "*.pdf"))):
         name = os.path.basename(p)
-        size_kb = round(os.path.getsize(p) / 1024, 1)
-        docs.append({"icon": "📄", "name": name, "type": "PDF", "date": _hint_date(name), "path": p, "size_kb": size_kb})
+        docs.append({"icon": "📄", "name": name, "type": "PDF", "date": _hint_date(name), "path": p, "size_kb": round(os.path.getsize(p)/1024, 1)})
     for p in sorted(glob.glob(os.path.join(DATA_DIR, "*.xlsx"))):
         name = os.path.basename(p)
-        size_kb = round(os.path.getsize(p) / 1024, 1)
-        docs.append({"icon": "📊", "name": name, "type": "Excel", "date": "—”", "path": p, "size_kb": size_kb})
+        docs.append({"icon": "📊", "name": name, "type": "Excel", "date": "—", "path": p, "size_kb": round(os.path.getsize(p)/1024, 1)})
+    for p in sorted(glob.glob(os.path.join(DATA_DIR, "*.csv"))):
+        name = os.path.basename(p)
+        docs.append({"icon": "📈", "name": name, "type": "CSV", "date": "—", "path": p, "size_kb": round(os.path.getsize(p)/1024, 1)})
     for p in sorted(glob.glob(os.path.join(DATA_DIR, "emails", "*.*"))):
         name = os.path.basename(p)
-        size_kb = round(os.path.getsize(p) / 1024, 1)
-        docs.append({"icon": "✉️", "name": name, "type": "Email", "date": _hint_date(name), "path": p, "size_kb": size_kb})
+        docs.append({"icon": "✉️", "name": name, "type": "Email", "date": _hint_date(name), "path": p, "size_kb": round(os.path.getsize(p)/1024, 1)})
     return docs
 
-
-def _hint_date(fname):
-    """Extract YYYY-MM-DD from filename like email_2024-10-14_..."""
-    import re
-    m = re.search(r"(\d{4}-\d{2}-\d{2})", fname)
-    return m.group(1) if m else "—”"
-
-
 def _detect_client(query: str) -> str:
-    """Best-effort client extraction from query text."""
     q = query.lower()
     for client in KNOWN_CLIENTS:
         if client in q:
             return client.title() + " Corp" if client in ("acme", "beta", "gamma") else client.title()
     return ""
 
-
-def pill_class(h):
-    t = h.metadata.get("source_type", "pdf")
-    return "email" if t == "email" else ("excel" if t == "excel" else "pdf")
-
-def pill_icon(h):
-    t = h.metadata.get("source_type", "pdf")
-    return "✉️" if t == "email" else ("âŠž" if t == "excel" else "â¬¡")
-
-
 def run_ingestion_with_spinner():
-    """Run ingest in-process with a lock to prevent concurrent runs."""
     if not _ingest_lock.acquire(blocking=False):
-        st.warning("â�³ Ingestion already running. Please wait.")
+        st.warning("⏳ Ingestion already running. Please wait.")
         return False
     try:
         with st.spinner("🔄 Re-indexing knowledge base..."):
@@ -675,10 +512,7 @@ def run_ingestion_with_spinner():
     finally:
         _ingest_lock.release()
 
-
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# Session state & Authentication
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── SESSION STATE INITIALIZATION ───────────────────────────────────────────────
 if "history" not in st.session_state:
     st.session_state.history = []
 if "high_contrast" not in st.session_state:
@@ -704,16 +538,16 @@ if "authenticated" not in st.session_state:
 
 if not st.session_state.authenticated:
     st.markdown("""
-    <div class="nx-hero" style="max-width:500px;margin:80px auto;text-align:center;">
-      <div class="nx-badge"><span class="dot"></span>NEXA SECURITY GATE</div>
-      <h2>Authentication Required</h2>
-      <p style="margin:12px 0 24px 0;">Enter workspace passkey to access knowledge base.</p>
+    <div class="nx-hero" style="max-width:480px;margin:80px auto;text-align:center;">
+      <div class="nx-hero-badge"><span class="dot"></span>NEXA SECURITY GATE</div>
+      <h1>Workspace Lock</h1>
+      <p style="margin:12px 0 24px 0;">Enter workspace passkey to access knowledge agent.</p>
     </div>
     """, unsafe_allow_html=True)
     
     col_a, col_b, col_c = st.columns([1, 2, 1])
     with col_b:
-        pass_input = st.text_input("Workspace Passkey", type="password", key="auth_pass")
+        pass_input = st.text_input("Passkey", type="password", key="auth_pass")
         if st.button("Unlock Workspace 🔑", use_container_width=True, type="primary"):
             if pass_input == APP_PASS:
                 st.session_state.authenticated = True
@@ -723,51 +557,42 @@ if not st.session_state.authenticated:
                 st.error("Invalid Passkey")
     st.stop()
 
-
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# HERO
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── HERO HEADER ───────────────────────────────────────────────────────────────
 provider_label = get_active_provider()
-pdf_count, sheet_count, email_count = count_docs()
+pdf_count, sheet_count, email_count, csv_count = count_docs()
 
 st.markdown(f"""
 <div class="nx-hero">
-  <div class="nx-badge"><span class="dot"></span>NEXA INTELLIGENCE ENGINE v2.0</div>
-  <h1>Knowledge Agent</h1>
-  <p>Ask natural questions across policy PDFs, multi-sheet spreadsheets, and email threads —”
-     get one instant, cited answer with AI-powered conflict detection and full audit traceability.</p>
-  <div class="nx-provider-pill"><span class="live-dot"></span>{provider_label} &nbsp;Â·&nbsp; LIVE INFERENCE</div>
+  <div class="nx-hero-badge"><span class="dot"></span>NEXA INTELLIGENCE ENGINE v2.0</div>
+  <h1>SME Knowledge Agent</h1>
+  <p>Ask natural questions across policy PDFs, spreadsheets, and email threads — get one instant, 
+     cited answer with AI conflict detection and full audit traceability.</p>
+  <div class="nx-provider-status"><span class="live-dot"></span>{provider_label} &nbsp;·&nbsp; ONLINE</div>
 </div>
 """, unsafe_allow_html=True)
 
-
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# SIDEBAR
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── SIDEBAR ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    # Stats
-    st.markdown("### ðŸ“š Knowledge Base")
+    st.markdown("### 📚 Knowledge Base")
     st.markdown(f"""
     <div class="bento-grid">
       <div class="bento-card"><span class="num">{pdf_count}</span><span class="lbl">PDFs</span></div>
       <div class="bento-card"><span class="num">{sheet_count}</span><span class="lbl">Sheets</span></div>
       <div class="bento-card"><span class="num">{email_count}</span><span class="lbl">Emails</span></div>
+      <div class="bento-card"><span class="num">{csv_count}</span><span class="lbl">CSVs</span></div>
     </div>
     """, unsafe_allow_html=True)
 
-    if not (os.environ.get("GEMINI_API_KEY") or os.environ.get("GROQ_API_KEY")):
-        st.caption("âš  Set `GROQ_API_KEY` or `GEMINI_API_KEY` for live LLM.")
-
     st.divider()
 
-    # Document browser
-    st.markdown("### ðŸ“� Documents")
+    # Document list
+    st.markdown("### 📂 Ingested Documents")
     all_docs = get_all_documents()
     if all_docs:
         docs_html = ""
-        for d in all_docs:
+        for d in all_docs[:8]:
             name = d["name"]
-            short = name[:28] + "—¦" if len(name) > 28 else name
+            short = name[:24] + "…" if len(name) > 24 else name
             docs_html += f"""
             <div class="doc-item">
               <span class="doc-icon">{d['icon']}</span>
@@ -775,139 +600,103 @@ with st.sidebar:
               <span class="doc-date">{d['date']}</span>
             </div>"""
         st.markdown(docs_html, unsafe_allow_html=True)
+        if len(all_docs) > 8:
+            st.caption(f"+ {len(all_docs)-8} more in repository")
     else:
         st.caption("No documents ingested yet.")
 
     st.divider()
 
     # Upload
-    st.markdown("### 📤 Upload")
-    st.caption("PDF Â· Excel Â· TXT Â· EML")
+    st.markdown("### 📤 Document Ingestion")
     uploaded_file = st.file_uploader(
-        " ", type=["pdf", "xlsx", "txt", "eml"],
-        label_visibility="collapsed", key="file_uploader"
+        "Upload PDF, Excel, CSV, or Email",
+        type=["pdf", "xlsx", "csv", "txt", "eml"],
+        label_visibility="collapsed",
+        key="file_uploader"
     )
     if uploaded_file is not None:
         if st.button("💾 Save & Ingest", use_container_width=True, type="primary"):
-            # Security: sanitize filename —” no path traversal
             fname = os.path.basename(uploaded_file.name)
             ext = fname.rsplit(".", 1)[-1].lower()
-            target_dir = DATA_DIR
             if ext == "pdf":
                 target_dir = os.path.join(DATA_DIR, "pdf_src")
             elif ext in ("txt", "eml"):
                 target_dir = os.path.join(DATA_DIR, "emails")
+            else:
+                target_dir = DATA_DIR
             os.makedirs(target_dir, exist_ok=True)
             save_path = os.path.join(target_dir, fname)
             with open(save_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
-            st.success(f"✓“ Saved `{fname}`")
+            st.success(f"Saved `{fname}`")
             if run_ingestion_with_spinner():
-                st.success("✓“ Re-indexed!")
+                st.success("Re-indexed knowledge base!")
                 st.rerun()
 
-    if st.button("🔄 Re-index All", use_container_width=True):
+    if st.button("🔄 Re-index All Files", use_container_width=True):
         if run_ingestion_with_spinner():
-            st.success("✓“ Re-indexed all documents.")
+            st.success("Re-indexed all documents.")
+            st.rerun()
 
     st.divider()
 
-    # Clear chat & Sign Out
+    # Accessibility Drawer / Settings
+    with st.expander("♿ Accessibility & Visual Settings"):
+        hc = st.checkbox("High Contrast Mode", value=st.session_state.high_contrast, key="hc_toggle")
+        lt = st.checkbox("Large Text Mode", value=st.session_state.large_text, key="lt_toggle")
+        rm = st.checkbox("Reduced Motion", value=st.session_state.reduced_motion, key="rm_toggle")
+        st.session_state.high_contrast = hc
+        st.session_state.large_text = lt
+        st.session_state.reduced_motion = rm
+
     if st.session_state.history:
-        if st.button("🗑️ Clear Chat", use_container_width=True):
+        if st.button("🗑️ Clear Chat History", use_container_width=True):
             st.session_state.history = []
             st.session_state.last_context = None
             st.rerun()
 
-    if APP_PASS:
-        if st.button("ðŸ”’ Sign Out", use_container_width=True):
-            st.session_state.authenticated = False
-            st.rerun()
+# Apply accessibility CSS classes dynamically
+classes = []
+if st.session_state.high_contrast: classes.append("high-contrast")
+if st.session_state.large_text: classes.append("large-text")
+if st.session_state.reduced_motion: classes.append("reduced-motion")
+if classes:
+    st.markdown(f'<script>document.querySelector(".stApp").className += " {" ".join(classes)}";</script>', unsafe_allow_html=True)
 
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# MAIN TABS
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── MAIN TABS ─────────────────────────────────────────────────────────────────
 tab_copilot, tab_docs, tab_crm, tab_analytics = st.tabs([
-    "◈  AI COPILOT",
-    "◈  DOCUMENTS",
-    "◈  CRM STUDIO",
-    "◈  ANALYTICS",
+    "💬  AI COPILOT",
+    "📄  KNOWLEDGE REPOSITORY",
+    "📝  CRM STUDIO",
+    "📊  ANALYTICS & AUDIT",
 ])
 
-
-# â”€â”€ TAB 1: COPILOT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── TAB 1: COPILOT ────────────────────────────────────────────────────────────
 with tab_copilot:
-
-    # Suggested queries —” categorized & dynamic
-    st.markdown('<div class="nx-section-label">Explore Suggested Queries</div>', unsafe_allow_html=True)
-    cat_refund, cat_terms, cat_warranty = st.tabs(["💳 Refund & Policy", "📋 Terms & Pricing", "ðŸ›¡ï¸� Warranty & Service"])
-    with cat_refund:
-        col_r1, col_r2 = st.columns(2)
-        with col_r1:
-            if st.button("What is our refund policy for bulk orders quoted to Acme Corp?", use_container_width=True, key="sug_refund_1"):
-                st.session_state.pending_query = "What is our refund policy for bulk orders quoted to Acme Corp?"
-        with col_r2:
-            if st.button("Are restocking fees waived on returned non-bulk items?", use_container_width=True, key="sug_refund_2"):
-                st.session_state.pending_query = "Are restocking fees waived on returned non-bulk items?"
-    with cat_terms:
-        col_t1, col_t2 = st.columns(2)
-        with col_t1:
-            if st.button("What payment terms apply to Beta LLC orders now?", use_container_width=True, key="sug_terms_1"):
-                st.session_state.pending_query = "What payment terms apply to Beta LLC orders now?"
-        with col_t2:
-            if st.button("What are the updated client payment terms effective 2025?", use_container_width=True, key="sug_terms_2"):
-                st.session_state.pending_query = "What are the updated client payment terms effective 2025?"
-    with cat_warranty:
-        col_w1, col_w2 = st.columns(2)
-        with col_w1:
-            if st.button("What's the current warranty period for hardware products?", use_container_width=True, key="sug_war_1"):
-                st.session_state.pending_query = "What's the current warranty period for hardware products?"
-        with col_w2:
-            if st.button("How are warranty claims processed for defective units?", use_container_width=True, key="sug_war_2"):
-                st.session_state.pending_query = "How are warranty claims processed for defective units?"
+    # Quick Prompt Chips
+    st.caption("Prompt Suggestions")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        if st.button("💳 What is the bulk order refund policy?", use_container_width=True, key="chip1"):
+            st.session_state.pending_query = "What is the bulk order refund policy?"
+    with c2:
+        if st.button("📋 What are client payment terms?", use_container_width=True, key="chip2"):
+            st.session_state.pending_query = "What are client payment terms?"
+    with c3:
+        if st.button("🛡️ What is hardware warranty duration?", use_container_width=True, key="chip3"):
+            st.session_state.pending_query = "What is hardware warranty duration?"
 
     st.write("")
 
-    # Chat history
+    # Chat history rendering
     for msg in st.session_state.history:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    if st.session_state.history:
-        st.markdown('<div class="nx-section-label">Session Actions</div>', unsafe_allow_html=True)
-        col_exp_md, col_exp_json, col_clear = st.columns([1, 1, 1])
-        with col_exp_md:
-            md_text = f"# Nexa AI Copilot Chat Transcript\nGenerated: {datetime.now():%Y-%m-%d %H:%M:%S}\n\n"
-            for m in st.session_state.history:
-                role = "Employee" if m["role"] == "user" else "Nexa AI"
-                md_text += f"### {role}\n{m['content']}\n\n"
-            st.download_button(
-                "📥 Export Chat (.md)",
-                data=md_text,
-                file_name=f"nexa_chat_{int(datetime.now().timestamp())}.md",
-                mime="text/markdown",
-                use_container_width=True,
-                key="export_chat_md"
-            )
-        with col_exp_json:
-            import json as _json
-            st.download_button(
-                "📊 Export Chat (.json)",
-                data=_json.dumps(st.session_state.history, indent=2),
-                file_name=f"nexa_chat_{int(datetime.now().timestamp())}.json",
-                mime="application/json",
-                use_container_width=True,
-                key="export_chat_json"
-            )
-        with col_clear:
-            if st.button("🗑️ Clear Session", use_container_width=True, key="copilot_clear_chat"):
-                st.session_state.history = []
-                st.session_state.last_context = None
-                st.rerun()
-
     # Chat input
-    query = st.chat_input("Query your knowledge base...")
+    query = st.chat_input("Ask a question about policies, terms, or orders...")
     if not query and st.session_state.get("pending_query"):
         query = st.session_state["pending_query"]
         del st.session_state["pending_query"]
@@ -918,14 +707,14 @@ with tab_copilot:
             st.markdown(query)
 
         with st.chat_message("assistant"):
-            with st.spinner("Scanning knowledge base..."):
-                prior_history = st.session_state.history[:-1]  # exclude current user msg
+            with st.spinner("Retrieving & analyzing sources..."):
+                prior_history = st.session_state.history[:-1]
                 hits = retrieve(query, top_k=5, history=prior_history)
                 conflicts = detect_conflicts(hits)
                 history_ctx = _build_history_context(prior_history)
-                from rag_engine import build_context_block, SYSTEM_PROMPT
                 context_block = build_context_block(hits, conflicts)
                 augmented_prompt = f"{history_ctx}QUESTION: {query}\n\n{context_block}" if history_ctx else f"QUESTION: {query}\n\n{context_block}"
+                
                 llm_fn = get_llm_fn()
                 if llm_fn:
                     try:
@@ -935,37 +724,36 @@ with tab_copilot:
                 else:
                     answer, _ = generate_answer(query, hits, conflicts, llm_call_fn=None)
 
-            # Conflict boxes
+            # Conflict Warning Box
             if conflicts:
                 for c in conflicts:
                     st.markdown(f"""
-<div class="nx-conflict">
-  <div class="nx-conflict-title">Policy conflict on &laquo;{html.escape(c['topic'].replace('_', ' ').upper())}&raquo;</div>
-  <div class="nx-conflict-row">
-    <span class="nx-conflict-tag trusted">TRUSTED</span>
-    <span>{html.escape(c['trusted'].citation)}</span>
-  </div>
-  {''.join(f'<div class="nx-conflict-row"><span class="nx-conflict-tag outdated">SUPERSEDED</span><span>{html.escape(o.citation)}</span></div>' for o in c['outdated'])}
-</div>
+                    <div class="nx-conflict">
+                      <div class="nx-conflict-title">⚠️ CONFLICT DETECTED · «{html.escape(c['topic'].replace('_', ' ').upper())}»</div>
+                      <div class="nx-conflict-row">
+                        <span class="nx-tag trusted">TRUSTED</span>
+                        <span>{html.escape(c['trusted'].citation)}</span>
+                      </div>
+                      {''.join(f'<div class="nx-conflict-row"><span class="nx-tag outdated">SUPERSEDED</span><span>{html.escape(o.citation)}</span></div>' for o in c['outdated'])}
+                    </div>
                     """, unsafe_allow_html=True)
 
-            # Confidence badge computed from retrieval distances
+            # Confidence & Response Header
             conf_label, conf_color = _confidence_label(hits)
-            st.markdown(f"""<div class="nx-answer-header">
-  <span style="color:#7c3aed;font-size:1rem;">◈</span>
-  <span class="nx-answer-header-text">Nexa Response</span>
-  <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:0.6rem;font-weight:700;
-         color:{conf_color};background:rgba(0,0,0,0.3);padding:2px 10px;border-radius:100px;
-         border:1px solid {conf_color}44;letter-spacing:0.1em;">
-    CONFIDENCE Â· {conf_label}
-  </span>
-</div>""", unsafe_allow_html=True)
+            st.markdown(f"""
+            <div style="display:flex;align-items:center;margin-bottom:10px;">
+              <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.95rem;color:#f1f5f9;">Nexa Answer</span>
+              <span style="margin-left:auto;font-family:'Fira Code',monospace;font-size:0.68rem;font-weight:700;
+                     color:{conf_color};background:rgba(0,0,0,0.3);padding:3px 12px;border-radius:100px;
+                     border:1px solid {conf_color}44;">
+                CONFIDENCE · {conf_label}
+              </span>
+            </div>
+            """, unsafe_allow_html=True)
 
-            # Render LLM answer safely via st.markdown (not raw HTML injection)
-            with st.container():
-                st.markdown(answer)
+            st.markdown(answer)
 
-            # Citation pills —” deduplicated by source file
+            # Deduplicated Citation Pills
             seen = set()
             unique_hits = []
             for h in hits:
@@ -975,44 +763,39 @@ with tab_copilot:
                     unique_hits.append(h)
 
             pills_html = "".join(
-                f'<span class="nx-pill {pill_class(h)}">{pill_icon(h)} {html.escape(h.metadata.get("source_name","?"))} Â· {h.metadata.get("doc_date","?")} <span style="font-size:0.62rem;opacity:0.85;margin-left:4px;padding:1px 6px;background:rgba(0,0,0,0.3);border-radius:100px;">{_match_score(h.distance)}% match</span></span>'
+                f'<span class="nx-pill">📎 {html.escape(h.metadata.get("source_name","?"))} · {h.metadata.get("doc_date","?")} <span class="nx-match-score">{_match_score(h.distance)}% match</span></span>'
                 for h in unique_hits
             )
-            st.markdown(
-                f'<div class="nx-section-label" style="margin-top:14px;">Citations</div>'
-                f'<div class="nx-citations">{pills_html}</div>',
-                unsafe_allow_html=True,
-            )
+            if pills_html:
+                st.markdown(f'<div class="nx-citations">{pills_html}</div>', unsafe_allow_html=True)
 
-            # Context inspector with relevance scores
-            with st.expander("◈  Inspect Retrieved Context & Relevance Metrics"):
+            # Context inspector
+            with st.expander("🔍 Inspect Retrieved Chunks"):
                 for idx, h in enumerate(hits, 1):
-                    st.markdown(f"**[{idx}] {h.citation}** &nbsp;—¢&nbsp; **Match Score:** `{_match_score(h.distance)}%` (`cosine distance: {round(h.distance, 4)}`)")
-                    st.code(h.text, language="markdown")
-                if conflicts:
-                    st.warning("âš ï¸� Conflict Detected across dated sources above!")
+                    st.markdown(f"**[{idx}] {h.citation}** — Match Score: `{_match_score(h.distance)}%` (`cosine distance: {round(h.distance, 4)}`)")
+                    st.code(h.text, language="text")
 
-            # Audit log
+            # Log Audit
             try:
                 from audit import log_qa_event
                 log_qa_event(query, answer, hits, conflicts)
             except Exception:
                 pass
 
-            # Action toolbar (Convert to CRM Ticket & Flag)
-            msg_index = len(st.session_state.history)
-            col_act1, col_act2 = st.columns([1, 1])
-            with col_act1:
-                if st.button("âš¡ Convert to CRM Ticket", key=f"crm_conv_{msg_index}", type="primary", use_container_width=True):
+            # Action Buttons
+            msg_idx = len(st.session_state.history)
+            ca1, ca2 = st.columns(2)
+            with ca1:
+                if st.button("📝 Convert to CRM Ticket", key=f"crm_{msg_idx}", type="primary", use_container_width=True):
                     st.session_state.last_context = {
                         "query": query, "answer": answer,
                         "hits": [{"text": h.text, "citation": h.citation} for h in hits],
                         "conflicts": [{"topic": c["topic"], "trusted": c["trusted"].citation} for c in conflicts],
                     }
                     st.session_state.crm_notice = True
-                    st.success("✓“ Copilot response transferred to CRM Ticket Studio! Switch to the ◈ CRM STUDIO tab to finalize.")
-            with col_act2:
-                if st.button("âš‘ Flag as Incorrect", key=f"flag-{msg_index}", use_container_width=True):
+                    st.success("Transferred context to CRM Ticket Studio! Switch to 📝 CRM STUDIO tab.")
+            with ca2:
+                if st.button("🚩 Flag Response", key=f"flag_{msg_idx}", use_container_width=True):
                     try:
                         from audit import log_qa_event
                         log_qa_event(f"[FLAGGED] {query}", answer, hits, conflicts)
@@ -1028,230 +811,111 @@ with tab_copilot:
             }
 
 
-# â”€â”€ TAB 2: DOCUMENTS (LIFECYCLE MANAGEMENT) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── TAB 2: KNOWLEDGE REPOSITORY ───────────────────────────────────────────────
 with tab_docs:
-    st.markdown('<div class="nx-section-label">Document Repository & Index Management</div>', unsafe_allow_html=True)
-    st.caption("Manage ingested business records, view index status, and delete outdated source files.")
+    st.markdown("### Document Repository Management")
+    st.caption("Inspect indexed documents, preview raw content, or trigger proactive conflict audits.")
 
     all_docs = get_all_documents()
-
     if not all_docs:
-        st.markdown("""
-<div style="text-align:center;padding:56px 0;">
-  <div style="font-size:3rem;margin-bottom:14px;">ðŸ“‚</div>
-  <div style="font-family:'Orbitron',sans-serif;font-size:0.85rem;color:#6d28d9;letter-spacing:0.15em;margin-bottom:8px;">EMPTY KNOWLEDGE BASE</div>
-  <div style="font-size:0.88rem;color:#4b5563;max-width:380px;margin:0 auto;line-height:1.7;">
-    No documents have been ingested yet.<br>Use the <strong style="color:#a78bfa;">📤 Upload</strong> panel in the sidebar to add PDFs, Excel workbooks, or email files.
-  </div>
-</div>
-""", unsafe_allow_html=True)
+        st.info("No documents indexed yet. Upload files using the sidebar.")
     else:
-        # Search & filter bar
-        col_search, col_filter = st.columns([3, 1])
-        with col_search:
-            search_term = st.text_input("ðŸ”� Search documents...", key="doc_search", placeholder="Filter by document name or keyword...").strip().lower()
-        with col_filter:
-            doc_type_filter = st.selectbox("Type Filter", ["All", "PDF", "Excel", "Email"], key="doc_filter")
-
-        filtered_docs = [
-            d for d in all_docs
-            if (not search_term or search_term in d["name"].lower())
-            and (doc_type_filter == "All" or d["type"] == doc_type_filter)
-        ]
-
-        st.write("")
-        st.markdown(f"**Showing {len(filtered_docs)} of {len(all_docs)} documents**")
+        search_term = st.text_input("🔍 Search files...", key="doc_search", placeholder="Filter by document name...").strip().lower()
+        filtered_docs = [d for d in all_docs if not search_term or search_term in d["name"].lower()]
 
         for idx, doc in enumerate(filtered_docs):
             with st.container():
                 cols = st.columns([0.5, 3, 1.5, 1.5, 2])
-                with cols[0]:
-                    st.markdown(f"### {doc['icon']}")
+                with cols[0]: st.markdown(f"### {doc['icon']}")
                 with cols[1]:
                     st.markdown(f"**{doc['name']}**")
-                    st.caption(f"Path: `data/{doc['type'].lower() if doc['type'] != 'Excel' else ''}/{doc['name']}`")
-                with cols[2]:
-                    st.markdown(f"**Type:** {doc['type']}")
-                    st.caption(f"Size: {doc['size_kb']} KB")
-                with cols[3]:
-                    st.markdown(f"**Document Date:**")
-                    st.caption(f"`{doc['date']}`")
+                    st.caption(f"Path: `{doc['path']}`")
+                with cols[2]: st.caption(f"Type: {doc['type']} | Size: {doc['size_kb']} KB")
+                with cols[3]: st.caption(f"Date: `{doc['date']}`")
                 with cols[4]:
-                    if st.button("🗑️ Delete File", key=f"del_doc_{idx}_{doc['name']}", type="secondary", use_container_width=True):
-                        # Delete vector embeddings from ChromaDB
+                    if st.button("🗑️ Delete Document", key=f"del_{idx}_{doc['name']}", use_container_width=True):
                         chunks_deleted = delete_document_from_index(doc["name"])
-                        # Remove file from disk
-                        try:
-                            if os.path.exists(doc["path"]):
-                                os.remove(doc["path"])
-                            st.cache_data.clear()
-                            st.success(f"Deleted `{doc['name']}` ({chunks_deleted} vector chunks removed).")
-                            st.rerun()
-                        except Exception as err:
-                            st.error(f"Failed to delete file: {err}")
-
-                col_exp1, col_exp2 = st.columns(2)
-                with col_exp1:
-                    with st.expander(f"ðŸ“– File Text Preview ({doc['name']})"):
-                        try:
-                            if doc["name"].endswith(".pdf"):
-                                from pypdf import PdfReader
-                                rdr = PdfReader(doc["path"])
-                                p_text = "\n".join(p.extract_text() or "" for p in rdr.pages[:3])
-                                st.text_area("PDF Text Sample", value=p_text[:1200], height=140, disabled=True, key=f"txtprev_{idx}_{doc['name']}")
-                            elif doc["name"].endswith(".xlsx"):
-                                import pandas as pd
-                                xl = pd.ExcelFile(doc["path"])
-                                st.caption(f"Sheets: `{', '.join(xl.sheet_names)}`")
-                                df_s = pd.read_excel(xl, sheet_name=xl.sheet_names[0])
-                                st.dataframe(df_s.head(4), use_container_width=True)
-                            else:
-                                with open(doc["path"], "r", encoding="utf-8", errors="ignore") as f:
-                                    txt_s = f.read()[:1200]
-                                st.text_area("Raw Content Sample", value=txt_s, height=140, disabled=True, key=f"txtprev_{idx}_{doc['name']}")
-                        except Exception as p_err:
-                            st.caption(f"Preview unavailable: {p_err}")
-
-                with col_exp2:
-                    with st.expander(f"ðŸ‘� Vector Chunks ({doc['name']})"):
-                        chunks = get_document_chunks(doc["name"])
-                        if not chunks:
-                            st.caption("No vector chunks found in ChromaDB.")
-                        else:
-                            st.markdown(f"**{len(chunks)} Chunk(s) Indexed:**")
-                            for ch in chunks[:5]:
-                                st.markdown(
-                                    f"- `{ch['section']}` | Topic: `{ch['topic']}` | Date: `{ch['doc_date']}`\n"
-                                    f"  ```text\n  {ch['text'][:180]}...\n  ```"
-                                )
-                            if len(chunks) > 5:
-                                st.caption(f"... +{len(chunks)-5} more chunks in ChromaDB")
+                        if os.path.exists(doc["path"]):
+                            os.remove(doc["path"])
+                        st.cache_data.clear()
+                        st.success(f"Deleted `{doc['name']}` ({chunks_deleted} vector chunks removed).")
+                        st.rerun()
 
                 st.divider()
 
-        st.markdown('<div class="nx-section-label">âš¡ Proactive Policy Conflict Scanner</div>', unsafe_allow_html=True)
-        st.caption("Perform a proactive full-database scan to identify all active policy contradictions across your knowledge base.")
-
-        if st.button("ðŸ”Ž Scan Entire Knowledge Base for Conflicts", key="btn_scan_all_conflicts", use_container_width=False):
-            with st.spinner("Scanning all indexed documents..."):
+        st.markdown("### 🔎 Proactive Policy Conflict Scanner")
+        if st.button("Scan All Indexed Documents for Contradictions", type="primary"):
+            with st.spinner("Scanning entire vector corpus..."):
                 active_conflicts = scan_all_conflicts()
                 if not active_conflicts:
-                    st.success("✓… Clean Knowledge Base: Zero contradictions detected across indexed documents!")
+                    st.success("Clean Corpus: Zero policy conflicts detected across all documents!")
                 else:
-                    st.warning(f"âš ï¸� Detected {len(active_conflicts)} active policy conflict(s) across your documents:")
-                    # B3: Dispatch webhook for proactive scan results
-                    try:
-                        from audit import _dispatch_webhook
-                        from datetime import datetime as _dt
-                        _dispatch_webhook({
-                            "timestamp": _dt.now().isoformat(),
-                            "query": "[PROACTIVE_SCAN]",
-                            "conflicts_detected": [
-                                {"topic": c["topic"], "trusted": c["trusted"].citation,
-                                 "outdated": [o.citation for o in c.get("outdated", [])]}
-                                for c in active_conflicts
-                            ],
-                        })
-                    except Exception:
-                        pass
+                    st.warning(f"Detected {len(active_conflicts)} active policy conflict(s):")
                     for c in active_conflicts:
                         st.markdown(f"""
-<div class="nx-conflict">
-  <div class="nx-conflict-title">Policy conflict on &laquo;{html.escape(c['topic'].replace('_', ' ').upper())}&raquo;</div>
-  <div class="nx-conflict-row">
-    <span class="nx-conflict-tag trusted">TRUSTED</span>
-    <span>{html.escape(c['trusted'].citation)}</span>
-  </div>
-  {''.join(f'<div class="nx-conflict-row"><span class="nx-conflict-tag outdated">SUPERSEDED</span><span>{html.escape(o.citation)}</span></div>' for o in c['outdated'])}
-</div>
+                        <div class="nx-conflict">
+                          <div class="nx-conflict-title">⚠️ CONFLICT · «{html.escape(c['topic'].replace('_', ' ').upper())}»</div>
+                          <div class="nx-conflict-row"><span class="nx-tag trusted">TRUSTED</span><span>{html.escape(c['trusted'].citation)}</span></div>
+                          {''.join(f'<div class="nx-conflict-row"><span class="nx-tag outdated">SUPERSEDED</span><span>{html.escape(o.citation)}</span></div>' for o in c['outdated'])}
+                        </div>
                         """, unsafe_allow_html=True)
 
 
-# â”€â”€ TAB 3: CRM STUDIO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── TAB 3: CRM STUDIO ─────────────────────────────────────────────────────────
 with tab_crm:
-    st.markdown('<div class="nx-section-label">CRM Support Ticket Generator</div>', unsafe_allow_html=True)
-    st.caption("Auto-populate customer support tickets from Nexa's cited answers.")
+    st.markdown("### CRM Ticket Generator")
+    st.caption("Convert AI Copilot answers into ready-to-send support tickets for HubSpot, Salesforce, or Zendesk.")
 
     if st.session_state.get("crm_notice"):
-        st.success("âš¡ Active Context Transferred from AI Copilot —” Ticket pre-populated below.")
+        st.success("Context loaded from AI Copilot!")
         st.session_state.crm_notice = False
 
     ctx = st.session_state.last_context
-    if ctx:
-        st.info(f"ðŸ“Œ **Active Ticket Source Context:** \"{ctx['query']}\" ({len(ctx['hits'])} cited document sources)")
     col1, col2 = st.columns(2)
 
     with col1:
-        subject = st.text_input("Ticket Subject", value=(ctx["query"] if ctx else ""), placeholder="e.g. Refund policy dispute")
-        # Smart client detection —” not hardcoded to Acme
+        subject = st.text_input("Ticket Subject", value=(ctx["query"] if ctx else ""), placeholder="e.g. Bulk order refund inquiry")
         auto_client = _detect_client(ctx["query"]) if ctx else ""
         client = st.text_input("Client Name", value=auto_client, placeholder="e.g. Acme Corp")
         priority = st.selectbox("Priority Level", ["Low", "Medium", "High", "Urgent"], index=1)
-        ticket_type = st.selectbox("Ticket Type", ["Policy Inquiry", "Refund Request", "Payment Dispute", "Warranty Claim", "Other"])
+        ticket_type = st.selectbox("Ticket Category", ["Policy Inquiry", "Refund Request", "Payment Dispute", "Warranty Claim"])
 
     with col2:
         body_default = ""
         if ctx:
             body_default = (
-                f"Auto-populated from Nexa on {datetime.now():%Y-%m-%d %H:%M}\n\n"
+                f"Generated from Nexa AI on {datetime.now():%Y-%m-%d %H:%M}\n\n"
                 f"Question: {ctx['query']}\n\n"
-                f"Answer:\n{ctx['answer']}\n\n"
-                f"Citations: {', '.join(h['citation'] for h in ctx['hits'])}"
+                f"Resolution:\n{ctx['answer']}\n\n"
+                f"Citations:\n" + "\n".join(f"- {h['citation']}" for h in ctx['hits'])
             )
-        body = st.text_area("Ticket Response Body", value=body_default, height=200, placeholder="Describe the issue and resolution...")
+        body = st.text_area("Ticket Response Draft", value=body_default, height=220)
 
-    if st.button("Create CRM Ticket âŸ¶", type="primary", use_container_width=False):
+    if st.button("Generate Ticket Record 🚀", type="primary"):
         if not subject.strip():
-            st.warning("Please enter a ticket subject.")
+            st.warning("Please enter a subject.")
         else:
             ticket = {
                 "id": f"TCK-{int(datetime.now().timestamp())}",
                 "subject": subject, "client": client,
                 "priority": priority, "type": ticket_type,
-                "body": body,
-                "created_at": datetime.now().isoformat(),
-                "source": "Nexa AI",
+                "body": body, "created_at": datetime.now().isoformat(),
             }
-            st.markdown(f"""
-<div class="nx-ticket">
-  <div class="nx-ticket-badge">✓“ TICKET CREATED</div>
-  <div style="font-family:'Orbitron',sans-serif;font-size:1rem;color:#34d399;margin-bottom:4px;">{ticket['id']}</div>
-  <div style="font-size:0.8rem;color:#6b7280;">Priority: {priority} Â· Type: {ticket_type}</div>
-  <div style="font-size:0.8rem;color:#6b7280;margin-top:4px;">Ready to sync Â· HubSpot / Zendesk / Salesforce</div>
-</div>
-            """, unsafe_allow_html=True)
+            st.success(f"Ticket `{ticket['id']}` generated!")
             
-            import json
-            import pandas as pd
-            ticket_json = json.dumps(ticket, indent=2)
-            ticket_df = pd.DataFrame([ticket])
-            ticket_csv = ticket_df.to_csv(index=False)
+            t_json = json.dumps(ticket, indent=2)
+            t_csv = pd.DataFrame([ticket]).to_csv(index=False)
 
-            col_dl1, col_dl2 = st.columns(2)
-            with col_dl1:
-                st.download_button(
-                    label="📥 Download JSON Ticket",
-                    data=ticket_json,
-                    file_name=f"{ticket['id']}.json",
-                    mime="application/json",
-                    use_container_width=True
-                )
-            with col_dl2:
-                st.download_button(
-                    label="📊 Download CSV Record",
-                    data=ticket_csv,
-                    file_name=f"{ticket['id']}.csv",
-                    mime="text/csv",
-                    use_container_width=True
-                )
-
-            with st.expander("◈ View Raw JSON Payload"):
-                st.json(ticket)
+            c_dl1, c_dl2 = st.columns(2)
+            with c_dl1:
+                st.download_button("📥 Download Ticket (.json)", data=t_json, file_name=f"{ticket['id']}.json", mime="application/json", use_container_width=True)
+            with c_dl2:
+                st.download_button("📊 Download Ticket (.csv)", data=t_csv, file_name=f"{ticket['id']}.csv", mime="text/csv", use_container_width=True)
 
 
-# â”€â”€ TAB 3: ANALYTICS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── TAB 4: ANALYTICS & AUDIT ──────────────────────────────────────────────────
 with tab_analytics:
-    st.markdown('<div class="nx-section-label">Knowledge Base Analytics & Audit Log</div>', unsafe_allow_html=True)
+    st.markdown("### Analytics & Live Audit Log")
 
     audit_file = os.path.join(DATA_DIR, "audit_log.jsonl")
     audit_entries = []
@@ -1260,111 +924,61 @@ with tab_analytics:
             for line in f:
                 if line.strip():
                     try:
-                        import json
                         audit_entries.append(json.loads(line))
                     except Exception:
                         pass
 
-    # Metrics row
-    col_a, col_b, col_c, col_d = st.columns(4)
-    with col_a:
-        st.metric("Total Queries", len(audit_entries))
-    with col_b:
-        conflict_count = sum(1 for e in audit_entries if e.get("conflicts_detected"))
-        st.metric("Conflicts Resolved", conflict_count)
-    with col_c:
-        flagged = sum(1 for e in audit_entries if e.get("query", "").startswith("[FLAGGED]"))
-        st.metric("Flagged Responses", flagged)
-    with col_d:
-        st.metric("Embedder", "384-dim MiniLM")
+    # Metrics
+    m1, m2, m3, m4 = st.columns(4)
+    with m1: st.metric("Total Queries", len(audit_entries))
+    with m2:
+        conf_count = sum(1 for e in audit_entries if e.get("conflicts_detected"))
+        st.metric("Conflicts Resolved", conf_count)
+    with m3:
+        flagged = sum(1 for e in audit_entries if str(e.get("query","")).startswith("[FLAGGED]"))
+        st.metric("Flagged Queries", flagged)
+    with m4: st.metric("Embedding Model", "384-dim MiniLM")
 
     st.divider()
 
-    # Visual Analytics Charts
-    st.markdown('<div class="nx-section-label">Document Distribution & Query Metrics</div>', unsafe_allow_html=True)
-    
-    col_chart1, col_chart2 = st.columns(2)
-    
-    import pandas as pd
-    
-    with col_chart1:
-        st.caption("📄 Knowledge Base Document Types")
-        doc_counts = pd.DataFrame({
-            "Source Type": ["PDF Documents", "Excel Workbooks", "Email Threads"],
-            "Count": [pdf_count, sheet_count, email_count]
+    # Visual Charts
+    col_c1, col_c2 = st.columns(2)
+    with col_c1:
+        st.caption("📄 Document Types in Knowledge Base")
+        df_docs = pd.DataFrame({
+            "Source Type": ["PDFs", "Excel Workbooks", "Email Threads", "CSVs"],
+            "Count": [pdf_count, sheet_count, email_count, csv_count]
         }).set_index("Source Type")
-        st.bar_chart(doc_counts, color="#7c3aed")
-        
-    with col_chart2:
-        st.caption("âš¡ Resolution & Conflict Rates")
-        normal_queries = max(0, len(audit_entries) - conflict_count - flagged)
-        resolution_counts = pd.DataFrame({
-            "Category": ["Direct Answers", "Conflicts Detected", "Flagged Queries"],
-            "Queries": [normal_queries, conflict_count, flagged]
+        st.bar_chart(df_docs, color="#6366f1")
+
+    with col_c2:
+        st.caption("📊 Resolution Breakdown")
+        df_res = pd.DataFrame({
+            "Category": ["Direct Answers", "Conflict Warnings", "Flagged Queries"],
+            "Count": [max(0, len(audit_entries)-conf_count-flagged), conf_count, flagged]
         }).set_index("Category")
-        st.bar_chart(resolution_counts, color="#ec4899")
+        st.bar_chart(df_res, color="#10b981")
 
     st.divider()
 
-    # B1: Export Audit Log
-    if audit_entries:
-        import json as _json
-        import pandas as _pd
-        col_exp1, col_exp2, _ = st.columns([1, 1, 2])
-        with col_exp1:
-            st.download_button(
-                label="📥 Export as JSON",
-                data=_json.dumps(audit_entries, indent=2),
-                file_name="nexa_audit_log.json",
-                mime="application/json",
-                use_container_width=True,
-            )
-        with col_exp2:
-            _df = _pd.DataFrame([{
-                "timestamp": e.get("timestamp", ""),
-                "query": e.get("query", ""),
-                "answer": e.get("answer", "")[:300],
-                "conflicts": len(e.get("conflicts_detected", [])),
-                "citations": len(e.get("citations", [])),
-            } for e in audit_entries])
-            st.download_button(
-                label="📊 Export as CSV",
-                data=_df.to_csv(index=False),
-                file_name="nexa_audit_log.csv",
-                mime="text/csv",
-                use_container_width=True,
-            )
-
-    st.divider()
-
-    # Audit timeline
-    st.markdown('<div class="nx-section-label">Recent Audit Trail</div>', unsafe_allow_html=True)
-
+    # Recent Audit Log Table
+    st.markdown("### Recent Audit Trail")
     if audit_entries:
         for entry in reversed(audit_entries[-15:]):
-            ts = entry.get("timestamp", "")[:19].replace("T", " ")
+            ts = str(entry.get("timestamp", ""))[:19].replace("T", " ")
             q = entry.get("query", "")
-            has_conflict = bool(entry.get("conflicts_detected"))
-            is_flagged = q.startswith("[FLAGGED]")
-
-            conflict_tag = '<span class="nx-audit-conflict-tag">âš  CONFLICT</span>' if has_conflict else ""
-            flagged_tag = '<span class="nx-audit-conflict-tag" style="background:rgba(251,146,60,0.1);color:#fbbf24;border-color:rgba(251,146,60,0.28);">âš‘ FLAGGED</span>' if is_flagged else ""
-            short_q = html.escape(q[:80]) + ("—¦" if len(q) > 80 else "")
-            short_a = html.escape(entry.get("answer", "")[:120]) + "—¦"
-
+            conf = bool(entry.get("conflicts_detected"))
+            flag = str(q).startswith("[FLAGGED]")
+            
             st.markdown(f"""
-<div class="nx-audit-entry">
-  <div class="nx-audit-time">ðŸ•� {ts}</div>
-  <div class="nx-audit-query">{short_q}</div>
-  <div style="font-size:0.78rem;color:#4b5563;-webkit-text-fill-color:#4b5563;margin-top:4px;">{short_a}</div>
-  <div style="margin-top:6px;">{conflict_tag}{flagged_tag}</div>
-</div>
+            <div class="nx-audit-entry">
+              <div class="nx-audit-time">🕒 {ts} · Call ID: {entry.get('call_id', 'N/A')}</div>
+              <div class="nx-audit-query">{html.escape(str(q))}</div>
+              <div style="font-size:0.8rem;color:#94a3b8;margin-top:4px;">{html.escape(str(entry.get('answer_preview', entry.get('answer','')))[:140])}...</div>
+              <div style="margin-top:6px;font-size:0.7rem;font-family:'Fira Code',monospace;color:#64748b;">
+                {'⚠️ CONFLICT DETECTED · ' if conf else ''}{'🚩 FLAGGED · ' if flag else ''}Confidence: {entry.get('confidence_level', 'N/A')}
+              </div>
+            </div>
             """, unsafe_allow_html=True)
     else:
-        st.markdown("""
-<div style="text-align:center;padding:48px 0;color:#374151;">
-  <div style="font-size:2.5rem;margin-bottom:12px;">ðŸ“­</div>
-  <div style="font-family:'Orbitron',sans-serif;font-size:0.8rem;color:#4b5563;letter-spacing:0.12em;">NO QUERIES YET</div>
-  <div style="font-size:0.85rem;color:#374151;margin-top:8px;">Ask a question in the AI Copilot tab to see analytics here.</div>
-</div>
-        """, unsafe_allow_html=True)
+        st.caption("No audit events recorded yet.")
