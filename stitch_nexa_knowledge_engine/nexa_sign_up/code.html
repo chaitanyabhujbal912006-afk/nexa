@@ -1,0 +1,325 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>NEXA - Sign Up</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary": "#c0c1ff",
+                    "surface-container-lowest": "#070d1f",
+                    "on-tertiary-container": "#002f38",
+                    "on-primary-fixed-variant": "#004395",
+                    "secondary-fixed-dim": "#c0c1ff",
+                    "surface-tint": "#adc6ff",
+                    "on-tertiary": "#003640",
+                    "secondary-fixed": "#e1e0ff",
+                    "surface-container": "#191f31",
+                    "tertiary-container": "#009eb9",
+                    "inverse-on-surface": "#2a3043",
+                    "on-secondary-fixed": "#07006c",
+                    "outline": "#8c909f",
+                    "surface-container-highest": "#2e3447",
+                    "on-secondary-container": "#b0b2ff",
+                    "on-background": "#dce1fb",
+                    "on-secondary": "#1000a9",
+                    "inverse-primary": "#005ac2",
+                    "surface-variant": "#2e3447",
+                    "primary-fixed": "#d8e2ff",
+                    "outline-variant": "#424754",
+                    "on-tertiary-fixed-variant": "#004e5c",
+                    "surface-bright": "#33394c",
+                    "on-primary": "#002e6a",
+                    "error-container": "#93000a",
+                    "on-tertiary-fixed": "#001f26",
+                    "on-surface": "#dce1fb",
+                    "surface-container-low": "#151b2d",
+                    "primary-container": "#4d8eff",
+                    "secondary-container": "#3131c0",
+                    "on-error": "#690005",
+                    "on-error-container": "#ffdad6",
+                    "on-secondary-fixed-variant": "#2f2ebe",
+                    "inverse-surface": "#dce1fb",
+                    "surface-container-high": "#23293c",
+                    "tertiary": "#4cd7f6",
+                    "primary": "#adc6ff",
+                    "surface": "#0c1324",
+                    "tertiary-fixed": "#acedff",
+                    "tertiary-fixed-dim": "#4cd7f6",
+                    "background": "#0c1324",
+                    "error": "#ffb4ab",
+                    "on-surface-variant": "#c2c6d6",
+                    "primary-fixed-dim": "#adc6ff",
+                    "on-primary-container": "#00285d",
+                    "surface-dim": "#0c1324",
+                    "on-primary-fixed": "#001a42"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "gutter": "24px",
+                    "container-max": "1440px",
+                    "unit": "4px",
+                    "margin-safe": "40px"
+            },
+            "fontFamily": {
+                    "body-md": [
+                            "Inter"
+                    ],
+                    "body-lg": [
+                            "Inter"
+                    ],
+                    "label-sm": [
+                            "Geist"
+                    ],
+                    "headline-lg": [
+                            "Geist"
+                    ],
+                    "headline-lg-mobile": [
+                            "Geist"
+                    ],
+                    "headline-md": [
+                            "Geist"
+                    ],
+                    "display-xl": [
+                            "Geist"
+                    ]
+            },
+            "fontSize": {
+                    "body-md": [
+                            "16px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "body-lg": [
+                            "18px",
+                            {
+                                    "lineHeight": "28px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "label-sm": [
+                            "12px",
+                            {
+                                    "lineHeight": "16px",
+                                    "letterSpacing": "0.05em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "headline-lg": [
+                            "48px",
+                            {
+                                    "lineHeight": "56px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "headline-lg-mobile": [
+                            "32px",
+                            {
+                                    "lineHeight": "40px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "headline-md": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "letterSpacing": "-0.01em",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "display-xl": [
+                            "72px",
+                            {
+                                    "lineHeight": "80px",
+                                    "letterSpacing": "-0.04em",
+                                    "fontWeight": "700"
+                            }
+                    ]
+            }
+    },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #020617; /* Base Level from design spec */
+            color: theme('colors.on-background');
+        }
+        
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid #1e293b;
+        }
+
+        .input-precision {
+            background-color: #0b0f1a;
+            border: 1px solid theme('colors.outline-variant');
+            transition: all 0.3s ease;
+        }
+
+        .input-precision:focus {
+            border-color: theme('colors.primary');
+            box-shadow: 0 0 12px rgba(173, 198, 255, 0.15); /* Electric Blue glow */
+            outline: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, theme('colors.primary-container'), theme('colors.secondary-container'));
+            border: 1px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+            box-shadow: 0 0 20px rgba(77, 142, 255, 0.2);
+        }
+
+        .btn-ghost {
+            background: transparent;
+            border: 1px solid theme('colors.primary-container');
+            color: theme('colors.primary');
+            transition: all 0.3s ease;
+        }
+
+        .btn-ghost:hover {
+            background: rgba(77, 142, 255, 0.1);
+        }
+
+        /* Flow diagram animation */
+        @keyframes pulse-flow {
+            0% { opacity: 0.3; transform: translateY(-5px); }
+            50% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0.3; transform: translateY(5px); }
+        }
+
+        .flow-arrow {
+            animation: pulse-flow 2s infinite ease-in-out;
+        }
+        .flow-arrow:nth-child(2) { animation-delay: 0.5s; }
+        .flow-arrow:nth-child(3) { animation-delay: 1s; }
+
+        .luminous-depth {
+            background: radial-gradient(circle at center, rgba(77, 142, 255, 0.15) 0%, transparent 70%);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-gutter relative overflow-hidden font-body-md text-body-md">
+<!-- Luminous background glow -->
+<div class="absolute inset-0 luminous-depth pointer-events-none z-0"></div>
+<div class="max-w-container-max w-full grid md:grid-cols-2 gap-gutter z-10 mx-auto">
+<!-- Left: Visualization -->
+<div class="hidden md:flex flex-col justify-center p-margin-safe glass-panel rounded-xl relative overflow-hidden">
+<!-- Decorative blueprint lines -->
+<div class="absolute inset-0 pointer-events-none" style="background-image: linear-gradient(#1e293b 1px, transparent 1px), linear-gradient(90deg, #1e293b 1px, transparent 1px); background-size: 40px 40px; opacity: 0.2;"></div>
+<div class="relative z-10 flex flex-col items-start gap-8">
+<h1 class="font-display-xl text-display-xl text-on-surface tracking-tighter">NEXA</h1>
+<p class="font-headline-md text-headline-md text-primary max-w-md">Build your intelligence workspace.</p>
+<!-- Core Visualization -->
+<div class="mt-12 flex flex-col items-center self-center w-full max-w-sm space-y-6">
+<div class="w-full glass-panel rounded-lg p-6 text-center border border-outline-variant">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider block mb-2">Data Source</span>
+<span class="font-body-lg text-body-lg text-on-surface">Your Knowledge</span>
+</div>
+<div class="flex flex-col items-center text-primary space-y-2">
+<span class="material-symbols-outlined flow-arrow">arrow_downward</span>
+<span class="material-symbols-outlined flow-arrow">arrow_downward</span>
+<span class="material-symbols-outlined flow-arrow">arrow_downward</span>
+</div>
+<div class="w-full glass-panel rounded-lg p-6 text-center border border-primary relative overflow-hidden group">
+<div class="absolute inset-0 bg-primary/5 group-hover:bg-primary/10 transition-colors duration-500"></div>
+<span class="font-label-sm text-label-sm text-primary uppercase tracking-wider block mb-2">Intelligence Engine</span>
+<span class="font-headline-md text-headline-md text-on-surface font-bold tracking-tight">NEXA</span>
+</div>
+<div class="flex flex-col items-center text-tertiary space-y-2">
+<span class="material-symbols-outlined flow-arrow" style="animation-delay: 0.3s">arrow_downward</span>
+<span class="material-symbols-outlined flow-arrow" style="animation-delay: 0.8s">arrow_downward</span>
+<span class="material-symbols-outlined flow-arrow" style="animation-delay: 1.3s">arrow_downward</span>
+</div>
+<div class="w-full glass-panel rounded-lg p-6 text-center border border-tertiary/50">
+<span class="font-label-sm text-label-sm text-tertiary uppercase tracking-wider block mb-2">Output</span>
+<span class="font-body-lg text-body-lg text-on-surface">Intelligent Answers</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Right: Sign Up Form -->
+<div class="flex flex-col justify-center max-w-md w-full mx-auto p-8 lg:p-12 glass-panel rounded-xl">
+<div class="mb-10 text-center md:text-left">
+<h2 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-2">Create your Nexa workspace.</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Initialize your dedicated intelligence instance.</p>
+</div>
+<form class="space-y-5" onsubmit="event.preventDefault();">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+<div class="space-y-2">
+<label class="font-label-sm text-label-sm text-outline block" for="fullName">Full Name</label>
+<input class="w-full px-4 py-3 rounded-lg input-precision text-on-surface placeholder-on-surface-variant/50 bg-surface-container-low/40" id="fullName" placeholder="Jane Doe" type="text">
+</div>
+<div class="space-y-2">
+<label class="font-label-sm text-label-sm text-outline block" for="role">Role</label>
+<input class="w-full px-4 py-3 rounded-lg input-precision text-on-surface placeholder-on-surface-variant/50 bg-surface-container-low/40" id="role" placeholder="Data Architect" type="text">
+</div>
+</div>
+<div class="space-y-2">
+<label class="font-label-sm text-label-sm text-outline block" for="workEmail">Work Email</label>
+<input class="w-full px-4 py-3 rounded-lg input-precision text-on-surface placeholder-on-surface-variant/50 bg-surface-container-low/40" id="workEmail" placeholder="jane@company.com" type="email">
+</div>
+<div class="space-y-2">
+<label class="font-label-sm text-label-sm text-outline block" for="company">Company / Organization</label>
+<input class="w-full px-4 py-3 rounded-lg input-precision text-on-surface placeholder-on-surface-variant/50 bg-surface-container-low/40" id="company" placeholder="Acme Corp" type="text">
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+<div class="space-y-2">
+<label class="font-label-sm text-label-sm text-outline block" for="password">Password</label>
+<input class="w-full px-4 py-3 rounded-lg input-precision text-on-surface placeholder-on-surface-variant/50 bg-surface-container-low/40" id="password" placeholder="••••••••" type="password">
+</div>
+<div class="space-y-2">
+<label class="font-label-sm text-label-sm text-outline block" for="confirmPassword">Confirm Password</label>
+<input class="w-full px-4 py-3 rounded-lg input-precision text-on-surface placeholder-on-surface-variant/50 bg-surface-container-low/40" id="confirmPassword" placeholder="••••••••" type="password">
+</div>
+</div>
+<div class="flex items-start gap-3 mt-6">
+<div class="flex items-center h-5">
+<input class="w-4 h-4 rounded border-outline-variant bg-surface-container-low text-primary focus:ring-primary focus:ring-offset-surface-container-lowest" id="terms" type="checkbox">
+</div>
+<label class="font-body-md text-sm text-on-surface-variant leading-tight" for="terms">
+                        I agree to the NEXA <a class="text-primary hover:underline" href="#">Terms of Service</a> and <a class="text-primary hover:underline" href="#">Privacy Protocol</a>.
+                    </label>
+</div>
+<button class="w-full btn-primary text-on-primary-fixed font-label-sm text-label-sm py-4 px-6 rounded-lg mt-8 flex items-center justify-center gap-2 group" type="submit">
+                    Create Nexa Workspace
+                    <span class="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</button>
+</form>
+<div class="mt-8 text-center border-t border-outline-variant pt-6">
+<p class="font-body-md text-sm text-on-surface-variant">
+                    Already have an account? 
+                    <a class="text-primary hover:text-primary-fixed font-medium inline-flex items-center gap-1 group" href="#">
+                        Sign in 
+                        <span class="material-symbols-outlined text-[16px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</a>
+</p>
+</div>
+</div>
+</div>
+
+
+</body></html>

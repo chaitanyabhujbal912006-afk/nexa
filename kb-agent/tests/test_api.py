@@ -14,9 +14,8 @@ def test_health_endpoint(client):
     data = response.json()
     assert data["status"] == "online"
     assert "provider" in data
-    assert "total_pdfs" in data
-    assert "total_sheets" in data
-    assert "total_emails" in data
+    assert "kb_stats" in data
+    assert "pdfs" in data["kb_stats"]
 
 
 def test_query_endpoint(client):
@@ -51,3 +50,24 @@ def test_conflicts_endpoint(client):
     data = response.json()
     assert "conflicts_count" in data
     assert "conflicts" in data
+
+
+def test_auth_otp_endpoints(client):
+    res_otp = client.post("/api/v1/auth/otp", json={"email": "test@company.com"})
+    assert res_otp.status_code == 200
+    assert res_otp.json()["status"] == "otp_sent"
+
+    res_verify = client.post("/api/v1/auth/verify", json={"email": "test@company.com", "code": "123456"})
+    assert res_verify.status_code == 200
+    assert "access_token" in res_verify.json()
+
+
+def test_pdf_report_endpoint(client):
+    payload = {
+        "title": "Test Executive Report",
+        "summary_text": "Summary of findings for testing.",
+    }
+    res = client.post("/api/v1/reports/pdf", json=payload)
+    assert res.status_code == 200
+    assert res.headers["content-type"] == "application/pdf"
+    assert len(res.content) > 500

@@ -1,6 +1,7 @@
 /**
- * Nexa Intelligence Engine API Client
+ * Nexa Intelligence Engine API Client v3.0
  * Connects Next.js Frontend to FastAPI Backend (Render / Local)
+ * Supports JWT Authentication, OTP Verification, and PDF Exports
  */
 
 export interface Citation {
@@ -71,8 +72,35 @@ export interface AuditEntry {
   flagged?: boolean;
 }
 
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user_id: string;
+  email: string;
+}
+
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY || '';
+
+export function getAuthToken(): string | null {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('nexa_token');
+  }
+  return null;
+}
+
+export function setAuthToken(token: string) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('nexa_token', token);
+  }
+}
+
+export function clearAuthToken() {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('nexa_token');
+    localStorage.removeItem('nexa_user_email');
+  }
+}
 
 async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {
@@ -80,7 +108,10 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
     ...(options.headers as Record<string, string>),
   };
 
-  if (API_KEY) {
+  const token = getAuthToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  } else if (API_KEY) {
     headers['X-API-Key'] = API_KEY;
   }
 
@@ -98,6 +129,20 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
 }
 
 export const api = {
+  // Auth Endpoints
+  sendOtp: (email: string) =>
+    fetchApi<{ status: string; email: string; message: string }>('/api/v1/auth/otp', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  verifyOtp: (email: string, code: string) =>
+    fetchApi<AuthResponse>('/api/v1/auth/verify', {
+      method: 'POST',
+      body: JSON.stringify({ email, code }),
+    }),
+
+  // System & Knowledge Endpoints
   getHealth: () => fetchApi<HealthResponse>('/api/v1/health'),
   
   query: (req: QueryRequest) =>
@@ -129,7 +174,10 @@ export const api = {
     formData.append('file', file);
 
     const headers: Record<string, string> = {};
-    if (API_KEY) {
+    const token = getAuthToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    } else if (API_KEY) {
       headers['X-API-Key'] = API_KEY;
     }
 
@@ -145,5 +193,39 @@ export const api = {
     }
 
     return res.json();
+  },
+
+  downloadPdfReport: async (title: string, summaryText: string, citations: Citation[] = []) => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    const token = getAuthToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const res = await fetch(`${API_BASE_URL}/api/v1/reports/pdf`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        title,
+        summary_text: summaryText,
+        citations,
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error('Failed to generate PDF report.');
+    }
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nexa_executive_report_${Date.now()}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   },
 };
