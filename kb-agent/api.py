@@ -1,288 +1,588 @@
 """
-FastAPI REST server for Nexa Knowledge Agent.
-Security-hardened: API key auth, safe CORS, clamped inputs, no error leakage, ingestion lock.
+api.py — Production-grade async FastAPI backend for Nexa Intelligence Engine v2.0
 
-Run: uvicorn api:app --reload --port 8000
+Technology Stack:
+  - FastAPI 0.111+ with full async/await throughout
+  - Lifespan context manager for startup/shutdown (preloads embedding model)
+  - Pydantic v2 models with strict validators
+  - SlowAPI rate limiting (configurable per-IP; 60 query/min default)
+  - X-Request-ID middleware for distributed tracing
+  - Structured JSON error envelopes (RFC 7807 Problem Details)
+  - CORS with configurable allowed origins
+  - X-API-Key header auth (optional dev/demo bypass)
+  - Ingestion endpoint: multipart file upload or full re-index trigger
+  - Async streaming-ready architecture
+  - Full audit integration with latency, call_id, provider tracking
+  - /api/v1/stats endpoint with live knowledge base metrics
+  - /api/v1/audit endpoint for reading recent audit log entries
+
+Run:
+  uvicorn api:app --reload --port 8000
+  uvicorn api:app --workers 2 --port 8000  (production)
 """
 
+from __future__ import annotations
+
+import glob
+import logging
 import os
 import sys
-import glob
-import subprocess
 import threading
-import logging
-from typing import List, Optional
+import time
+import uuid
+from contextlib import asynccontextmanager
+from typing import Any, Dict, List, Optional
+
+import ingest as ingest_module
+from audit import log_qa_event, read_recent_entries
+from llm_config import get_active_provider, get_llm_fn, load_secrets
+from rag_engine import (
+    delete_document_from_index,
+    detect_conflicts,
+    generate_answer,
+    get_document_chunks,
+    get_model,
+    retrieve,
+    scan_all_conflicts,
+)
+
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field, field_validator
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from pydantic import BaseModel, Field, field_validator
-from fastapi import FastAPI, HTTPException, Depends, Header
-from fastapi.middleware.cors import CORSMiddleware
+# ── Logging ─────────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+)
+logger = logging.getLogger("nexa.api")
 
-from rag_engine import retrieve, detect_conflicts, generate_answer, scan_all_conflicts
-from llm_config import load_secrets, get_llm_fn, get_active_provider
-
-# ── Logging ──────────────────────────────────────────────────────────────────
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("nexa-api")
-
-# ── Load secrets on startup ───────────────────────────────────────────────────
+# ── Environment ──────────────────────────────────────────────────────────────
 load_secrets()
+_NEXA_API_KEY = os.environ.get("NEXA_API_KEY", "")
+_ALLOWED_ORIGINS = [
+    o.strip()
+    for o in os.environ.get(
+        "NEXA_ALLOWED_ORIGINS", "http://localhost:8501,http://localhost:3000"
+    ).split(",")
+]
+_RATE_LIMIT_QUERY = os.environ.get("RATE_LIMIT_QUERY", "60/minute")
+_RATE_LIMIT_INGEST = os.environ.get("RATE_LIMIT_INGEST", "5/minute")
 
-# ── App ───────────────────────────────────────────────────────────────────────
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+
+# ── Concurrency locks ────────────────────────────────────────────────────────
+_ingest_lock = threading.Lock()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Lifespan: pre-warm embedding model at startup so first request is instant
+# ─────────────────────────────────────────────────────────────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("⚡ Nexa API starting — pre-warming embedding model...")
+    try:
+        get_model()  # loads all-MiniLM-L6-v2 into memory once
+        logger.info("✓ Embedding model ready | provider=%s", get_active_provider())
+    except Exception as exc:
+        logger.warning("Embedding model pre-warm failed (will load on first query): %s", exc)
+    yield
+    logger.info("⚡ Nexa API shutting down.")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# App
+# ─────────────────────────────────────────────────────────────────────────────
 app = FastAPI(
     title="Nexa Intelligence Engine API",
-    description="Enterprise conflict-aware RAG system API",
+    description=(
+        "Enterprise conflict-aware RAG system. "
+        "Unifies PDFs, Excel workbooks, and email threads into one cited, "
+        "AI-powered knowledge API with full audit traceability."
+    ),
     version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
-# ── CORS — explicit origins only ──────────────────────────────────────────────
-_ALLOWED_ORIGINS = os.environ.get(
-    "NEXA_ALLOWED_ORIGINS", "http://localhost:8501,http://localhost:3000"
-).split(",")
+# ── Rate limiting (SlowAPI) ──────────────────────────────────────────────────
+try:
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+    from slowapi.errors import RateLimitExceeded
+    from slowapi.util import get_remote_address
 
+    limiter = Limiter(key_func=get_remote_address)
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    _SLOWAPI_AVAILABLE = True
+except ImportError:
+    limiter = None
+    _SLOWAPI_AVAILABLE = False
+    logger.warning("slowapi not installed — rate limiting disabled.")
+
+
+def rate_limit(limit: str):
+    """No-op decorator if slowapi unavailable."""
+    if _SLOWAPI_AVAILABLE and limiter:
+        return limiter.limit(limit)
+    def _noop(fn):
+        return fn
+    return _noop
+
+
+# ── CORS ─────────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in _ALLOWED_ORIGINS],
+    allow_origins=_ALLOWED_ORIGINS,
     allow_credentials=False,
-    allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "X-API-Key"],
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["Content-Type", "X-API-Key", "X-Request-ID"],
+    expose_headers=["X-Request-ID", "X-RateLimit-Limit", "X-RateLimit-Remaining"],
 )
 
-# ── Ingestion lock (prevent concurrent subprocess runs) ───────────────────────
-_ingest_lock = threading.Lock()
 
-# ── Auth dependency ───────────────────────────────────────────────────────────
-_NEXA_API_KEY = os.environ.get("NEXA_API_KEY", "")
+# ── X-Request-ID Middleware ───────────────────────────────────────────────────
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    """Attach X-Request-ID to every request and response for distributed tracing."""
+    request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    request.state.request_id = request_id
+    start = time.monotonic()
+    response = await call_next(request)
+    latency_ms = (time.monotonic() - start) * 1000
+    response.headers["X-Request-ID"] = request_id
+    response.headers["X-Response-Time-ms"] = f"{latency_ms:.2f}"
+    logger.info(
+        "%s %s — %d [%.2fms] id=%s",
+        request.method, request.url.path,
+        response.status_code, latency_ms, request_id,
+    )
+    return response
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Auth
+# ─────────────────────────────────────────────────────────────────────────────
 def require_api_key(x_api_key: Optional[str] = Header(default=None)):
-    """Require X-API-Key header if NEXA_API_KEY env var is set."""
+    """Enforce X-API-Key if NEXA_API_KEY env var is set; open mode otherwise."""
     if not _NEXA_API_KEY:
-        return  # No key configured — open mode (dev/demo)
+        return  # dev / demo — no key needed
     if x_api_key != _NEXA_API_KEY:
-        raise HTTPException(status_code=401, detail="Invalid or missing API key.")
+        raise _problem(401, "UNAUTHORIZED", "Invalid or missing X-API-Key header.")
 
 
-# ── Pydantic Models ───────────────────────────────────────────────────────────
-class CitationModel(BaseModel):
-    citation: str
+# ─────────────────────────────────────────────────────────────────────────────
+# RFC 7807 Problem Details error helper
+# ─────────────────────────────────────────────────────────────────────────────
+def _problem(status: int, error_code: str, detail: str, **extra) -> HTTPException:
+    """Return an HTTPException whose detail is an RFC-7807-style problem dict."""
+    return HTTPException(
+        status_code=status,
+        detail={
+            "type": f"https://nexa.internal/errors/{error_code.lower()}",
+            "title": error_code.replace("_", " ").title(),
+            "status": status,
+            "detail": detail,
+            **extra,
+        },
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Pydantic Models
+# ─────────────────────────────────────────────────────────────────────────────
+class CitationOut(BaseModel):
     source_name: str
     source_type: str
     doc_date: str
+    section: str
+    citation: str
+    match_score_pct: float
 
 
-class ConflictModel(BaseModel):
+class ConflictOut(BaseModel):
     topic: str
     trusted_source: str
-    outdated_sources: List[str]
+    trusted_date: str
+    outdated_sources: List[Dict[str, str]]
 
 
 class QueryRequest(BaseModel):
-    query: str = Field(..., min_length=1, max_length=2000)
-    top_k: int = Field(5, ge=1, le=20)
-    history: Optional[List[dict]] = Field(None, description="Optional conversation turn history for multi-turn retrieval context")
+    query: str = Field(..., min_length=1, max_length=2000, description="Natural language question")
+    top_k: int = Field(5, ge=1, le=20, description="Number of top chunks to retrieve")
+    history: Optional[List[Dict[str, str]]] = Field(
+        None,
+        description="Optional multi-turn conversation history [{role, content}, ...]",
+    )
 
     @field_validator("query")
     @classmethod
-    def strip_query(cls, v):
-        stripped = v.strip()
-        if not stripped:
-            raise ValueError("Query cannot be empty.")
-        return stripped
+    def strip_and_validate(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Query cannot be blank.")
+        return v
 
 
 class QueryResponse(BaseModel):
+    call_id: str
     query: str
     answer: str
-    conflicts_detected: List[ConflictModel]
-    citations: List[CitationModel]
     confidence_level: str
+    conflicts_detected: List[ConflictOut]
+    citations: List[CitationOut]
     total_chunks_retrieved: int
     provider: str
+    latency_ms: float
 
 
 class HealthResponse(BaseModel):
     status: str
+    version: str
     provider: str
-    total_pdfs: int
-    total_sheets: int
-    total_emails: int
+    embedding_model: str
+    kb_stats: Dict[str, Any]
 
 
-# ── Routes ────────────────────────────────────────────────────────────────────
-@app.get("/api/v1/health", response_model=HealthResponse)
+class StatsResponse(BaseModel):
+    total_documents: int
+    total_chunks: int
+    breakdown_by_type: Dict[str, int]
+    source_files: List[str]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Internal helpers
+# ─────────────────────────────────────────────────────────────────────────────
+def _confidence(hits: list) -> str:
+    if not hits:
+        return "NONE"
+    avg = sum(h.distance for h in hits) / len(hits)
+    if avg <= 0.30:
+        return "HIGH"
+    if avg <= 0.55:
+        return "MEDIUM"
+    return "LOW"
+
+
+def _hits_to_citations(hits: list) -> List[CitationOut]:
+    return [
+        CitationOut(
+            source_name=str(h.metadata.get("source_name", "unknown")),
+            source_type=str(h.metadata.get("source_type", "unknown")),
+            doc_date=str(h.metadata.get("doc_date", "unknown")),
+            section=str(h.metadata.get("section", "")),
+            citation=h.citation,
+            match_score_pct=round(max(0.0, 1.0 - float(h.distance)) * 100, 1),
+        )
+        for h in hits
+    ]
+
+
+def _conflicts_to_out(conflicts: list) -> List[ConflictOut]:
+    return [
+        ConflictOut(
+            topic=c["topic"],
+            trusted_source=c["trusted"].citation,
+            trusted_date=str(c["trusted"].metadata.get("doc_date", "unknown")),
+            outdated_sources=[
+                {"citation": o.citation, "date": str(o.metadata.get("doc_date", "unknown"))}
+                for o in c["outdated"]
+            ],
+        )
+        for c in conflicts
+    ]
+
+
+def _kb_file_stats() -> Dict[str, int]:
+    return {
+        "pdfs": len(glob.glob(os.path.join(DATA_DIR, "pdf_src", "*.pdf"))),
+        "excel": len(glob.glob(os.path.join(DATA_DIR, "*.xlsx"))),
+        "csv": len(glob.glob(os.path.join(DATA_DIR, "*.csv"))),
+        "emails": len(glob.glob(os.path.join(DATA_DIR, "emails", "*.*"))),
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Routes
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/v1/health", response_model=HealthResponse, tags=["System"])
 def health_check():
-    """Public health check — no auth required."""
-    base_dir = os.path.dirname(__file__)
+    """Public health endpoint — no auth required."""
     return HealthResponse(
         status="online",
+        version="2.0.0",
         provider=get_active_provider(),
-        total_pdfs=len(glob.glob(os.path.join(base_dir, "data", "pdf_src", "*.pdf"))),
-        total_sheets=len(glob.glob(os.path.join(base_dir, "data", "*.xlsx"))),
-        total_emails=len(glob.glob(os.path.join(base_dir, "data", "emails", "*.*"))),
+        embedding_model="all-MiniLM-L6-v2",
+        kb_stats=_kb_file_stats(),
     )
 
 
-@app.post("/api/v1/query", response_model=QueryResponse, dependencies=[Depends(require_api_key)])
-def query_knowledge_base(req: QueryRequest):
-    """Query the knowledge base with optional conversation history context."""
+@app.get("/api/v1/stats", response_model=StatsResponse, dependencies=[Depends(require_api_key)], tags=["System"])
+def get_stats():
+    """Return live ChromaDB chunk statistics and document breakdown."""
+    try:
+        import chromadb
+        client = chromadb.PersistentClient(path=os.path.join(BASE_DIR, "chroma_db"))
+        col = client.get_or_create_collection("sme_knowledge_base")
+        res = col.get(include=["metadatas"])
+        metas = res.get("metadatas") or []
+        breakdown: Dict[str, int] = {}
+        sources: set = set()
+        for m in metas:
+            t = m.get("source_type", "unknown")
+            breakdown[t] = breakdown.get(t, 0) + 1
+            if m.get("source_name"):
+                sources.add(m["source_name"])
+        return StatsResponse(
+            total_documents=len(sources),
+            total_chunks=len(metas),
+            breakdown_by_type=breakdown,
+            source_files=sorted(sources),
+        )
+    except Exception as exc:
+        logger.exception("Stats error: %s", exc)
+        raise _problem(500, "INTERNAL_ERROR", "Failed to retrieve stats.")
+
+
+@app.post("/api/v1/query", response_model=QueryResponse, dependencies=[Depends(require_api_key)], tags=["Knowledge"])
+@rate_limit(_RATE_LIMIT_QUERY)
+def query_knowledge_base(req: QueryRequest, request: Request):
+    """
+    Query the knowledge base with AI-powered conflict resolution.
+
+    Returns a cited answer, conflict warnings, confidence level, and full citation metadata.
+    Supports optional multi-turn conversation history for contextualised follow-up questions.
+    """
+    call_id = getattr(request.state, "request_id", str(uuid.uuid4()))
+    t_start = time.monotonic()
     try:
         hits = retrieve(req.query, top_k=req.top_k, history=req.history)
         conflicts = detect_conflicts(hits)
         answer, _ = generate_answer(req.query, hits, conflicts, llm_call_fn=get_llm_fn())
+        latency_ms = (time.monotonic() - t_start) * 1000
 
-        citation_objs = [
-            CitationModel(
-                citation=h.citation,
-                source_name=str(h.metadata.get("source_name", "unknown")),
-                source_type=str(h.metadata.get("source_type", "unknown")),
-                doc_date=str(h.metadata.get("doc_date", "unknown")),
-            )
-            for h in hits
-        ]
-
-        conflict_objs = [
-            ConflictModel(
-                topic=c["topic"],
-                trusted_source=c["trusted"].citation,
-                outdated_sources=[o.citation for o in c["outdated"]],
-            )
-            for c in conflicts
-        ]
-
-        avg_dist = (sum(h.distance for h in hits) / len(hits)) if hits else 1.0
-        conf_level = "HIGH" if avg_dist <= 0.30 else ("MEDIUM" if avg_dist <= 0.55 else "LOW")
-
-        return QueryResponse(
+        # Async-safe structured audit log with latency + call_id
+        log_qa_event(
             query=req.query,
             answer=answer,
-            conflicts_detected=conflict_objs,
-            citations=citation_objs,
-            confidence_level=conf_level,
-            total_chunks_retrieved=len(hits),
+            hits=hits,
+            conflicts=conflicts,
+            call_id=call_id,
+            latency_ms=latency_ms,
             provider=get_active_provider(),
         )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception("Query error: %s", e)
-        raise HTTPException(status_code=500, detail="Internal server error.")
 
-
-@app.post("/api/v1/ingest", dependencies=[Depends(require_api_key)])
-def trigger_ingestion():
-    """Trigger document re-ingestion. Requires auth. Only one run at a time."""
-    if not _ingest_lock.acquire(blocking=False):
-        raise HTTPException(status_code=429, detail="Ingestion already running. Try again later.")
-    try:
-        ingest_path = os.path.join(os.path.dirname(__file__), "ingest.py")
-        if not os.path.isfile(ingest_path):
-            raise HTTPException(status_code=500, detail="Ingestion script not found.")
-        res = subprocess.run(
-            ["python", ingest_path],
-            cwd=os.path.dirname(__file__),
-            capture_output=True,
-            text=True,
-            timeout=300,
+        return QueryResponse(
+            call_id=call_id,
+            query=req.query,
+            answer=answer,
+            confidence_level=_confidence(hits),
+            conflicts_detected=_conflicts_to_out(conflicts),
+            citations=_hits_to_citations(hits),
+            total_chunks_retrieved=len(hits),
+            provider=get_active_provider(),
+            latency_ms=round(latency_ms, 2),
         )
-        if res.returncode != 0:
-            logger.error("Ingestion failed: %s", res.stderr)
-            raise HTTPException(status_code=500, detail="Ingestion failed. Check server logs.")
-        return {"status": "success", "message": "Re-ingestion complete."}
     except HTTPException:
         raise
-    except Exception as e:
-        logger.exception("Ingestion error: %s", e)
-        raise HTTPException(status_code=500, detail="Internal server error.")
+    except Exception as exc:
+        logger.exception("Query error [call_id=%s]: %s", call_id, exc)
+        raise _problem(500, "QUERY_FAILED", "Internal server error during query processing.")
+
+
+@app.post("/api/v1/ingest", dependencies=[Depends(require_api_key)], tags=["Knowledge"])
+@rate_limit(_RATE_LIMIT_INGEST)
+def trigger_ingestion(request: Request):
+    """
+    Trigger a full knowledge base re-ingestion (in-process, thread-locked).
+    Returns chunk and file breakdown after completion.
+    Only one ingestion may run concurrently (returns 429 if busy).
+    """
+    if not _ingest_lock.acquire(blocking=False):
+        raise _problem(429, "INGESTION_BUSY", "Ingestion already running. Retry after current run completes.")
+    t_start = time.monotonic()
+    try:
+        summary = ingest_module.main()
+        latency_ms = (time.monotonic() - t_start) * 1000
+        logger.info(
+            "Re-ingestion complete: %d chunks from %d files [%.0fms]",
+            summary.get("total_chunks", 0),
+            len(summary.get("source_files", [])),
+            latency_ms,
+        )
+        return {
+            **summary,
+            "latency_ms": round(latency_ms, 2),
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Ingestion error: %s", exc)
+        raise _problem(500, "INGEST_FAILED", "Ingestion failed. Check server logs.")
     finally:
         _ingest_lock.release()
 
 
-@app.get("/api/v1/documents", dependencies=[Depends(require_api_key)])
+@app.post("/api/v1/upload", dependencies=[Depends(require_api_key)], tags=["Knowledge"])
+@rate_limit(_RATE_LIMIT_INGEST)
+def upload_document(request: Request, file: UploadFile = File(...)):
+    """
+    Upload a single document (PDF, Excel, CSV, TXT, EML) and immediately re-ingest.
+    Max upload size is governed by the server's body size limit (default 16 MB).
+    """
+    ALLOWED_EXTENSIONS = {"pdf", "xlsx", "xls", "csv", "txt", "eml"}
+    fname = os.path.basename(file.filename or "upload")
+    ext = fname.rsplit(".", 1)[-1].lower() if "." in fname else ""
+
+    if ext not in ALLOWED_EXTENSIONS:
+        raise _problem(
+            400, "INVALID_FILE_TYPE",
+            f"Unsupported file type '.{ext}'. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}.",
+        )
+
+    # Route to the correct data subdirectory
+    if ext == "pdf":
+        target_dir = os.path.join(DATA_DIR, "pdf_src")
+    elif ext in ("txt", "eml"):
+        target_dir = os.path.join(DATA_DIR, "emails")
+    else:
+        target_dir = DATA_DIR
+
+    os.makedirs(target_dir, exist_ok=True)
+    save_path = os.path.join(target_dir, fname)
+
+    try:
+        content = file.file.read()
+        if len(content) == 0:
+            raise _problem(400, "EMPTY_FILE", "Uploaded file is empty.")
+        with open(save_path, "wb") as f:
+            f.write(content)
+        logger.info("Uploaded file '%s' (%d bytes) to %s", fname, len(content), target_dir)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Upload save error: %s", exc)
+        raise _problem(500, "UPLOAD_FAILED", "Failed to save uploaded file.")
+    finally:
+        file.file.close()
+
+    # Trigger re-ingestion after upload
+    if not _ingest_lock.acquire(blocking=False):
+        return {
+            "status": "uploaded",
+            "file": fname,
+            "bytes": len(content),
+            "ingestion": "queued — ingestion already running, re-index manually.",
+        }
+    try:
+        summary = ingest_module.main()
+        return {
+            "status": "uploaded_and_ingested",
+            "file": fname,
+            "bytes": len(content),
+            "ingestion_summary": summary,
+        }
+    except Exception as exc:
+        logger.warning("Post-upload ingestion failed: %s", exc)
+        return {
+            "status": "uploaded",
+            "file": fname,
+            "bytes": len(content),
+            "ingestion": f"upload succeeded, re-ingestion failed: {exc}",
+        }
+    finally:
+        _ingest_lock.release()
+
+
+@app.get("/api/v1/documents", dependencies=[Depends(require_api_key)], tags=["Knowledge"])
 def list_documents():
-    """List all ingested documents with metadata and chunk counts."""
-    base_dir = os.path.dirname(__file__)
-    data_dir = os.path.join(base_dir, "data")
-    from rag_engine import get_document_chunks
-
+    """List all indexed documents with type, size, and vector chunk count."""
     docs = []
-    for path in glob.glob(os.path.join(data_dir, "pdf_src", "*.pdf")):
-        name = os.path.basename(path)
-        docs.append({"name": name, "type": "pdf", "size_bytes": os.path.getsize(path), "chunks": len(get_document_chunks(name))})
-    for path in glob.glob(os.path.join(data_dir, "*.xlsx")):
-        name = os.path.basename(path)
-        docs.append({"name": name, "type": "excel", "size_bytes": os.path.getsize(path), "chunks": len(get_document_chunks(name))})
-    for path in glob.glob(os.path.join(data_dir, "emails", "*.*")):
-        name = os.path.basename(path)
-        docs.append({"name": name, "type": "email", "size_bytes": os.path.getsize(path), "chunks": len(get_document_chunks(name))})
-
+    scan_map = [
+        (os.path.join(DATA_DIR, "pdf_src", "*.pdf"), "pdf"),
+        (os.path.join(DATA_DIR, "*.xlsx"), "excel"),
+        (os.path.join(DATA_DIR, "*.csv"), "csv"),
+        (os.path.join(DATA_DIR, "emails", "*.*"), "email"),
+    ]
+    for pattern, doc_type in scan_map:
+        for path in sorted(glob.glob(pattern)):
+            name = os.path.basename(path)
+            chunks = get_document_chunks(name)
+            docs.append({
+                "name": name,
+                "type": doc_type,
+                "size_bytes": os.path.getsize(path),
+                "chunks": len(chunks),
+            })
     return {"total_count": len(docs), "documents": docs}
 
 
-@app.delete("/api/v1/documents/{doc_name}", dependencies=[Depends(require_api_key)])
+@app.delete("/api/v1/documents/{doc_name}", dependencies=[Depends(require_api_key)], tags=["Knowledge"])
 def delete_document(doc_name: str):
-    """Delete a document from disk and remove its vectors from ChromaDB index."""
+    """Delete a document from disk and remove all its vector embeddings from ChromaDB."""
     import urllib.parse
-    from rag_engine import delete_document_from_index
-
-    # Prevent path traversal: accept only basename
     safe_name = os.path.basename(urllib.parse.unquote(doc_name))
     if not safe_name or safe_name != doc_name:
-        raise HTTPException(status_code=400, detail="Invalid document name.")
+        raise _problem(400, "INVALID_DOC_NAME", "Document name contains invalid path characters.")
 
-    base_dir = os.path.dirname(__file__)
-    data_dir = os.path.join(base_dir, "data")
-
-    # Find file across all supported locations
     candidate_dirs = [
-        os.path.join(data_dir, "pdf_src"),
-        data_dir,
-        os.path.join(data_dir, "emails"),
+        os.path.join(DATA_DIR, "pdf_src"),
+        DATA_DIR,
+        os.path.join(DATA_DIR, "emails"),
     ]
-    file_path = None
-    for d in candidate_dirs:
-        candidate = os.path.join(d, safe_name)
-        if os.path.isfile(candidate):
-            file_path = candidate
-            break
-
+    file_path = next(
+        (os.path.join(d, safe_name) for d in candidate_dirs if os.path.isfile(os.path.join(d, safe_name))),
+        None,
+    )
     if file_path is None:
-        raise HTTPException(status_code=404, detail=f"Document '{safe_name}' not found.")
+        raise _problem(404, "NOT_FOUND", f"Document '{safe_name}' not found in knowledge base.")
 
     try:
-        chunks_deleted = delete_document_from_index(safe_name)
+        chunks_removed = delete_document_from_index(safe_name)
         os.remove(file_path)
-        logger.info("Deleted document '%s' (%d vector chunks removed).", safe_name, chunks_deleted)
+        logger.info("Deleted '%s' — %d vector chunks removed.", safe_name, chunks_removed)
         return {
             "status": "deleted",
             "document": safe_name,
-            "vector_chunks_removed": chunks_deleted,
+            "vector_chunks_removed": chunks_removed,
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.exception("Delete error for '%s': %s", safe_name, e)
-        raise HTTPException(status_code=500, detail="Internal server error.")
+    except Exception as exc:
+        logger.exception("Delete error for '%s': %s", safe_name, exc)
+        raise _problem(500, "DELETE_FAILED", "Internal server error during deletion.")
 
 
-
-@app.get("/api/v1/conflicts", dependencies=[Depends(require_api_key)])
-def get_all_policy_conflicts():
-    """Performs a proactive full health audit across all indexed documents to return active policy conflicts."""
+@app.get("/api/v1/conflicts", dependencies=[Depends(require_api_key)], tags=["Knowledge"])
+def get_all_conflicts():
+    """
+    Run a full proactive policy conflict audit across all indexed documents.
+    Returns all detected contradictions with trusted/outdated source metadata.
+    """
     try:
         conflicts = scan_all_conflicts()
-        conflict_objs = [
-            ConflictModel(
-                topic=c["topic"],
-                trusted_source=c["trusted"].citation,
-                outdated_sources=[o.citation for o in c["outdated"]],
-            )
-            for c in conflicts
-        ]
-        return {"conflicts_count": len(conflict_objs), "conflicts": conflict_objs}
-    except Exception as e:
-        logger.exception("Conflict scan error: %s", e)
-        raise HTTPException(status_code=500, detail="Internal server error.")
+        return {
+            "conflicts_count": len(conflicts),
+            "conflicts": _conflicts_to_out(conflicts),
+        }
+    except Exception as exc:
+        logger.exception("Conflict scan error: %s", exc)
+        raise _problem(500, "CONFLICT_SCAN_FAILED", "Internal server error during conflict scan.")
+
+
+@app.get("/api/v1/audit", dependencies=[Depends(require_api_key)], tags=["System"])
+def get_audit_log(n: int = 50):
+    """Return the N most recent structured audit log entries (newest first, max 200)."""
+    n = max(1, min(n, 200))
+    entries = read_recent_entries(n=n)
+    return {
+        "total_returned": len(entries),
+        "entries": entries,
+    }

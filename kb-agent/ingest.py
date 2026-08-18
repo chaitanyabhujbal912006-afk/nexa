@@ -194,7 +194,6 @@ def sanitize_topic(text):
     clean = re.sub(r"[^a-zA-Z0-9\s_]", "", str(text)).strip().lower()
     clean = re.sub(r"\s+", "_", clean)
     return clean[:40] if clean else "general"
-    return clean[:40] if clean else "general"
 
 
 def ingest_emails():
