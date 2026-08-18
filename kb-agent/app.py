@@ -16,19 +16,19 @@ from llm_config import load_secrets, get_active_provider, get_llm_fn
 
 st.set_page_config(
     page_title="Nexa — SME Knowledge Agent",
-    page_icon="⚡",
+    page_icon="âš¡",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 load_secrets()
 
-# ── Ingestion lock (shared with API server concept) ────────────────────────────
+# â”€â”€ Ingestion lock (shared with API server concept) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 _ingest_lock = threading.Lock()
 
-# ─────────────────────────────────────────────────────────────────────────────
-# CSS — Same cyberpunk theme, fully fixed
-# ─────────────────�/* ─── GLASSMORPHISM DESIGN SYSTEM ─── */
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# CSS —” Same cyberpunk theme, fully fixed
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â/* â”€â”€â”€ GLASSMORPHISM DESIGN SYSTEM â”€â”€â”€ */
 :root {
   --glass-bg: rgba(18, 10, 38, 0.45);
   --glass-bg-hover: rgba(28, 15, 58, 0.65);
@@ -37,7 +37,7 @@ _ingest_lock = threading.Lock()
   --glass-blur: blur(18px) saturate(190%);
 }
 
-/* ─── HERO GLASS CARD ─── */
+/* â”€â”€â”€ HERO GLASS CARD â”€â”€â”€ */
 .nx-hero {
     position: relative; overflow: hidden;
     background: linear-gradient(135deg, rgba(124,58,237,0.18) 0%, rgba(99,102,241,0.12) 50%, rgba(236,72,153,0.1) 100%) !important;
@@ -108,7 +108,7 @@ _ingest_lock = threading.Lock()
     box-shadow: 0 0 6px #34d399; animation: blink 1.2s ease-in-out infinite;
 }
 
-/* ─── BENTO STAT CARDS GLASS ─── */
+/* â”€â”€â”€ BENTO STAT CARDS GLASS â”€â”€â”€ */
 .bento-grid {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0;
 }
@@ -137,7 +137,7 @@ _ingest_lock = threading.Lock()
     font-family: 'JetBrains Mono', monospace !important; margin-top: 4px;
 }
 
-/* ─── DOCUMENT BROWSER GLASS ─── */
+/* â”€â”€â”€ DOCUMENT BROWSER GLASS â”€â”€â”€ */
 .doc-item {
     display: flex; align-items: center; gap: 10px;
     padding: 10px 12px; border-radius: 12px;
@@ -163,7 +163,7 @@ _ingest_lock = threading.Lock()
     font-family: 'JetBrains Mono', monospace; flex-shrink: 0;
 }
 
-/* ─── TABS ─── */
+/* â”€â”€â”€ TABS â”€â”€â”€ */
 [data-testid="stTabs"] button {
     font-family: 'Orbitron', sans-serif !important;
     font-size: 0.7rem !important; font-weight: 700 !important;
@@ -181,7 +181,7 @@ _ingest_lock = threading.Lock()
     color: #c4b5fd !important; background: rgba(124,58,237,0.07) !important;
 }
 
-/* ─── BUTTONS GLASS ─── */
+/* â”€â”€â”€ BUTTONS GLASS â”€â”€â”€ */
 [data-testid="stButton"] > button {
     background: rgba(20, 10, 42, 0.45) !important;
     border: 1px solid rgba(255, 255, 255, 0.12) !important;
@@ -213,7 +213,7 @@ _ingest_lock = threading.Lock()
     transform: translateY(-2px) !important;
 }
 
-/* ─── CHAT INPUT GLASS ─── */
+/* â”€â”€â”€ CHAT INPUT GLASS â”€â”€â”€ */
 [data-testid="stChatInput"] { background: transparent !important; border: none !important; padding: 0 !important; }
 [data-testid="stChatInput"] > div {
     background: rgba(14, 6, 32, 0.65) !important;
@@ -243,7 +243,7 @@ _ingest_lock = threading.Lock()
     color: #ffffff !important; margin-right: 6px !important;
 }
 
-/* ─── FILE UPLOADER GLASS ─── */
+/* â”€â”€â”€ FILE UPLOADER GLASS â”€â”€â”€ */
 [data-testid="stFileUploader"] { background: transparent !important; border: none !important; padding: 0 !important; }
 [data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] {
     background: rgba(124,58,237,0.06) !important;
@@ -264,7 +264,7 @@ _ingest_lock = threading.Lock()
     color: #a78bfa !important; font-size: 0.68rem !important;
 }
 
-/* ─── ALL INPUTS / TEXTAREAS / SELECTS GLASS ─── */
+/* â”€â”€â”€ ALL INPUTS / TEXTAREAS / SELECTS GLASS â”€â”€â”€ */
 [data-testid="stTextInput"] > div,
 [data-testid="stTextArea"] > div,
 [data-testid="stSelectbox"] > div,
@@ -342,7 +342,7 @@ li[data-baseweb="option"][aria-selected="true"] {
     text-transform: uppercase !important; letter-spacing: 0.08em !important;
 }
 
-/* ─── CHAT MESSAGES GLASS ─── */
+/* â”€â”€â”€ CHAT MESSAGES GLASS â”€â”€â”€ */
 [data-testid="stChatMessage"] {
     background: transparent !important; border: none !important;
     color: #e2d9f3 !important; -webkit-text-fill-color: #e2d9f3 !important;
@@ -361,7 +361,7 @@ li[data-baseweb="option"][aria-selected="true"] {
     color: #e2d9f3 !important; -webkit-text-fill-color: #e2d9f3 !important;
 }
 
-/* ─── CONFLICT BOX GLASS ─── */
+/* â”€â”€â”€ CONFLICT BOX GLASS â”€â”€â”€ */
 .nx-conflict {
     background: linear-gradient(135deg, rgba(236,72,153,0.08) 0%, rgba(251,146,60,0.05) 100%) !important;
     border: 1px solid rgba(236,72,153,0.45) !important; border-left: 4px solid #ec4899 !important;
@@ -371,7 +371,7 @@ li[data-baseweb="option"][aria-selected="true"] {
     position: relative; overflow: hidden;
 }
 .nx-conflict::before {
-    content: '⚠ CONFLICT';
+    content: 'âš  CONFLICT';
     position: absolute; top: 10px; right: 14px;
     font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
     font-weight: 700; letter-spacing: 0.12em; color: #ec4899;
@@ -390,7 +390,7 @@ li[data-baseweb="option"][aria-selected="true"] {
 .nx-conflict-tag.trusted { background: rgba(52,211,153,0.12); color: #34d399; border: 1px solid rgba(52,211,153,0.35); }
 .nx-conflict-tag.outdated { background: rgba(236,72,153,0.12); color: #f9a8d4; border: 1px solid rgba(236,72,153,0.35); }
 
-/* ─── ANSWER BOX GLASS ─── */
+/* â”€â”€â”€ ANSWER BOX GLASS â”€â”€â”€ */
 .nx-answer-header {
     display: flex; align-items: center; gap: 10px;
     background: linear-gradient(135deg, rgba(124,58,237,0.25), rgba(99,102,241,0.12)) !important;
@@ -416,7 +416,7 @@ li[data-baseweb="option"][aria-selected="true"] {
     color: #e2d9f3 !important; -webkit-text-fill-color: #e2d9f3 !important;
 }
 
-/* ─── SECTION LABEL ─── */
+/* â”€â”€â”€ SECTION LABEL â”€â”€â”€ */
 .nx-section-label {
     font-family: 'Orbitron', sans-serif; font-size: 0.62rem; font-weight: 700;
     letter-spacing: 0.18em; color: #64748b; text-transform: uppercase;
@@ -428,7 +428,7 @@ li[data-baseweb="option"][aria-selected="true"] {
     background: linear-gradient(90deg, rgba(124,58,237,0.35), transparent);
 }
 
-/* ─── CITATION PILLS GLASS ─── */
+/* â”€â”€â”€ CITATION PILLS GLASS â”€â”€â”€ */
 .nx-citations { display: flex; flex-wrap: wrap; gap: 7px; margin: 12px 0; }
 .nx-pill {
     display: inline-flex; align-items: center; gap: 6px;
@@ -442,7 +442,7 @@ li[data-baseweb="option"][aria-selected="true"] {
 .nx-pill.excel { background: rgba(52,211,153,0.1); border-color: rgba(52,211,153,0.35); color: #6ee7b7; }
 .nx-pill:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
 
-/* ─── TICKET CARD GLASS ─── */
+/* â”€â”€â”€ TICKET CARD GLASS â”€â”€â”€ */
 .nx-ticket {
     background: rgba(52,211,153,0.06) !important; border: 1px solid rgba(52,211,153,0.3) !important;
     border-radius: 18px; padding: 20px 24px; margin-top: 14px; position: relative;
@@ -456,7 +456,7 @@ li[data-baseweb="option"][aria-selected="true"] {
     padding: 3px 10px; border-radius: 100px; display: inline-block; margin-bottom: 8px;
 }
 
-/* ─── ANALYTICS GLASS ─── */
+/* â”€â”€â”€ ANALYTICS GLASS â”€â”€â”€ */
 .nx-analytics {
     background: rgba(14, 6, 32, 0.55); border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 18px; padding: 20px 24px; margin-bottom: 12px; backdrop-filter: blur(16px);
@@ -481,7 +481,7 @@ li[data-baseweb="option"][aria-selected="true"] {
     padding: 2px 8px; border-radius: 100px; margin-top: 4px; font-weight: 700;
 }
 
-/* ─── METRIC GLASS CARDS ─── */
+/* â”€â”€â”€ METRIC GLASS CARDS â”€â”€â”€ */
 [data-testid="stMetric"] {
     background: rgba(20, 10, 42, 0.45) !important;
     border: 1px solid rgba(255, 255, 255, 0.12) !important;
@@ -496,7 +496,7 @@ li[data-baseweb="option"][aria-selected="true"] {
     font-size: 0.68rem !important; text-transform: uppercase !important; letter-spacing: 0.08em !important;
 }
 
-/* ─── EXPANDERS GLASS ─── */
+/* â”€â”€â”€ EXPANDERS GLASS â”€â”€â”€ */
 [data-testid="stExpander"] {
     background: rgba(18, 9, 38, 0.45) !important;
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
@@ -524,7 +524,7 @@ body::after {
     pointer-events: none; z-index: 9999;
 }
 
-/* ─── RESPONSIVE ─── */
+/* â”€â”€â”€ RESPONSIVE â”€â”€â”€ */
 @media (max-width: 768px) {
     .nx-hero { padding: 20px 18px !important; border-radius: 14px !important; }
     .nx-hero h1 { font-size: 1.7rem !important; }
@@ -535,9 +535,9 @@ body::after {
 """, unsafe_allow_html=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Helpers
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 BASE_DIR = os.path.dirname(__file__)
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -625,11 +625,11 @@ def get_all_documents():
     for p in sorted(glob.glob(os.path.join(DATA_DIR, "*.xlsx"))):
         name = os.path.basename(p)
         size_kb = round(os.path.getsize(p) / 1024, 1)
-        docs.append({"icon": "📊", "name": name, "type": "Excel", "date": "—", "path": p, "size_kb": size_kb})
+        docs.append({"icon": "📊", "name": name, "type": "Excel", "date": "—”", "path": p, "size_kb": size_kb})
     for p in sorted(glob.glob(os.path.join(DATA_DIR, "emails", "*.*"))):
         name = os.path.basename(p)
         size_kb = round(os.path.getsize(p) / 1024, 1)
-        docs.append({"icon": "✉", "name": name, "type": "Email", "date": _hint_date(name), "path": p, "size_kb": size_kb})
+        docs.append({"icon": "✉️", "name": name, "type": "Email", "date": _hint_date(name), "path": p, "size_kb": size_kb})
     return docs
 
 
@@ -637,7 +637,7 @@ def _hint_date(fname):
     """Extract YYYY-MM-DD from filename like email_2024-10-14_..."""
     import re
     m = re.search(r"(\d{4}-\d{2}-\d{2})", fname)
-    return m.group(1) if m else "—"
+    return m.group(1) if m else "—”"
 
 
 def _detect_client(query: str) -> str:
@@ -655,13 +655,13 @@ def pill_class(h):
 
 def pill_icon(h):
     t = h.metadata.get("source_type", "pdf")
-    return "✉" if t == "email" else ("⊞" if t == "excel" else "⬡")
+    return "✉️" if t == "email" else ("âŠž" if t == "excel" else "â¬¡")
 
 
 def run_ingestion_with_spinner():
     """Run ingest in-process with a lock to prevent concurrent runs."""
     if not _ingest_lock.acquire(blocking=False):
-        st.warning("⏳ Ingestion already running. Please wait.")
+        st.warning("â�³ Ingestion already running. Please wait.")
         return False
     try:
         with st.spinner("🔄 Re-indexing knowledge base..."):
@@ -676,11 +676,17 @@ def run_ingestion_with_spinner():
         _ingest_lock.release()
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Session state & Authentication
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 if "history" not in st.session_state:
     st.session_state.history = []
+if "high_contrast" not in st.session_state:
+    st.session_state.high_contrast = False
+if "large_text" not in st.session_state:
+    st.session_state.large_text = False
+if "reduced_motion" not in st.session_state:
+    st.session_state.reduced_motion = False
 if "last_context" not in st.session_state:
     st.session_state.last_context = None
 if "pending_query" not in st.session_state:
@@ -718,9 +724,9 @@ if not st.session_state.authenticated:
     st.stop()
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # HERO
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 provider_label = get_active_provider()
 pdf_count, sheet_count, email_count = count_docs()
 
@@ -728,19 +734,19 @@ st.markdown(f"""
 <div class="nx-hero">
   <div class="nx-badge"><span class="dot"></span>NEXA INTELLIGENCE ENGINE v2.0</div>
   <h1>Knowledge Agent</h1>
-  <p>Ask natural questions across policy PDFs, multi-sheet spreadsheets, and email threads —
+  <p>Ask natural questions across policy PDFs, multi-sheet spreadsheets, and email threads —”
      get one instant, cited answer with AI-powered conflict detection and full audit traceability.</p>
-  <div class="nx-provider-pill"><span class="live-dot"></span>{provider_label} &nbsp;·&nbsp; LIVE INFERENCE</div>
+  <div class="nx-provider-pill"><span class="live-dot"></span>{provider_label} &nbsp;Â·&nbsp; LIVE INFERENCE</div>
 </div>
 """, unsafe_allow_html=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # SIDEBAR
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 with st.sidebar:
     # Stats
-    st.markdown("### 📚 Knowledge Base")
+    st.markdown("### ðŸ“š Knowledge Base")
     st.markdown(f"""
     <div class="bento-grid">
       <div class="bento-card"><span class="num">{pdf_count}</span><span class="lbl">PDFs</span></div>
@@ -750,18 +756,18 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     if not (os.environ.get("GEMINI_API_KEY") or os.environ.get("GROQ_API_KEY")):
-        st.caption("⚠ Set `GROQ_API_KEY` or `GEMINI_API_KEY` for live LLM.")
+        st.caption("âš  Set `GROQ_API_KEY` or `GEMINI_API_KEY` for live LLM.")
 
     st.divider()
 
     # Document browser
-    st.markdown("### 📁 Documents")
+    st.markdown("### ðŸ“� Documents")
     all_docs = get_all_documents()
     if all_docs:
         docs_html = ""
         for d in all_docs:
             name = d["name"]
-            short = name[:28] + "…" if len(name) > 28 else name
+            short = name[:28] + "—¦" if len(name) > 28 else name
             docs_html += f"""
             <div class="doc-item">
               <span class="doc-icon">{d['icon']}</span>
@@ -776,14 +782,14 @@ with st.sidebar:
 
     # Upload
     st.markdown("### 📤 Upload")
-    st.caption("PDF · Excel · TXT · EML")
+    st.caption("PDF Â· Excel Â· TXT Â· EML")
     uploaded_file = st.file_uploader(
         " ", type=["pdf", "xlsx", "txt", "eml"],
         label_visibility="collapsed", key="file_uploader"
     )
     if uploaded_file is not None:
         if st.button("💾 Save & Ingest", use_container_width=True, type="primary"):
-            # Security: sanitize filename — no path traversal
+            # Security: sanitize filename —” no path traversal
             fname = os.path.basename(uploaded_file.name)
             ext = fname.rsplit(".", 1)[-1].lower()
             target_dir = DATA_DIR
@@ -795,33 +801,33 @@ with st.sidebar:
             save_path = os.path.join(target_dir, fname)
             with open(save_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
-            st.success(f"✓ Saved `{fname}`")
+            st.success(f"✓“ Saved `{fname}`")
             if run_ingestion_with_spinner():
-                st.success("✓ Re-indexed!")
+                st.success("✓“ Re-indexed!")
                 st.rerun()
 
     if st.button("🔄 Re-index All", use_container_width=True):
         if run_ingestion_with_spinner():
-            st.success("✓ Re-indexed all documents.")
+            st.success("✓“ Re-indexed all documents.")
 
     st.divider()
 
     # Clear chat & Sign Out
     if st.session_state.history:
-        if st.button("🗑 Clear Chat", use_container_width=True):
+        if st.button("🗑️ Clear Chat", use_container_width=True):
             st.session_state.history = []
             st.session_state.last_context = None
             st.rerun()
 
     if APP_PASS:
-        if st.button("🔒 Sign Out", use_container_width=True):
+        if st.button("ðŸ”’ Sign Out", use_container_width=True):
             st.session_state.authenticated = False
             st.rerun()
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # MAIN TABS
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 tab_copilot, tab_docs, tab_crm, tab_analytics = st.tabs([
     "◈  AI COPILOT",
     "◈  DOCUMENTS",
@@ -830,12 +836,12 @@ tab_copilot, tab_docs, tab_crm, tab_analytics = st.tabs([
 ])
 
 
-# ── TAB 1: COPILOT ────────────────────────────────────────────────────────────
+# â”€â”€ TAB 1: COPILOT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 with tab_copilot:
 
-    # Suggested queries — categorized & dynamic
+    # Suggested queries —” categorized & dynamic
     st.markdown('<div class="nx-section-label">Explore Suggested Queries</div>', unsafe_allow_html=True)
-    cat_refund, cat_terms, cat_warranty = st.tabs(["💳 Refund & Policy", "📋 Terms & Pricing", "🛡️ Warranty & Service"])
+    cat_refund, cat_terms, cat_warranty = st.tabs(["💳 Refund & Policy", "📋 Terms & Pricing", "ðŸ›¡ï¸� Warranty & Service"])
     with cat_refund:
         col_r1, col_r2 = st.columns(2)
         with col_r1:
@@ -895,7 +901,7 @@ with tab_copilot:
                 key="export_chat_json"
             )
         with col_clear:
-            if st.button("🗑 Clear Session", use_container_width=True, key="copilot_clear_chat"):
+            if st.button("🗑️ Clear Session", use_container_width=True, key="copilot_clear_chat"):
                 st.session_state.history = []
                 st.session_state.last_context = None
                 st.rerun()
@@ -951,7 +957,7 @@ with tab_copilot:
   <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:0.6rem;font-weight:700;
          color:{conf_color};background:rgba(0,0,0,0.3);padding:2px 10px;border-radius:100px;
          border:1px solid {conf_color}44;letter-spacing:0.1em;">
-    CONFIDENCE · {conf_label}
+    CONFIDENCE Â· {conf_label}
   </span>
 </div>""", unsafe_allow_html=True)
 
@@ -959,7 +965,7 @@ with tab_copilot:
             with st.container():
                 st.markdown(answer)
 
-            # Citation pills — deduplicated by source file
+            # Citation pills —” deduplicated by source file
             seen = set()
             unique_hits = []
             for h in hits:
@@ -969,7 +975,7 @@ with tab_copilot:
                     unique_hits.append(h)
 
             pills_html = "".join(
-                f'<span class="nx-pill {pill_class(h)}">{pill_icon(h)} {html.escape(h.metadata.get("source_name","?"))} · {h.metadata.get("doc_date","?")} <span style="font-size:0.62rem;opacity:0.85;margin-left:4px;padding:1px 6px;background:rgba(0,0,0,0.3);border-radius:100px;">{_match_score(h.distance)}% match</span></span>'
+                f'<span class="nx-pill {pill_class(h)}">{pill_icon(h)} {html.escape(h.metadata.get("source_name","?"))} Â· {h.metadata.get("doc_date","?")} <span style="font-size:0.62rem;opacity:0.85;margin-left:4px;padding:1px 6px;background:rgba(0,0,0,0.3);border-radius:100px;">{_match_score(h.distance)}% match</span></span>'
                 for h in unique_hits
             )
             st.markdown(
@@ -981,10 +987,10 @@ with tab_copilot:
             # Context inspector with relevance scores
             with st.expander("◈  Inspect Retrieved Context & Relevance Metrics"):
                 for idx, h in enumerate(hits, 1):
-                    st.markdown(f"**[{idx}] {h.citation}** &nbsp;•&nbsp; **Match Score:** `{_match_score(h.distance)}%` (`cosine distance: {round(h.distance, 4)}`)")
+                    st.markdown(f"**[{idx}] {h.citation}** &nbsp;—¢&nbsp; **Match Score:** `{_match_score(h.distance)}%` (`cosine distance: {round(h.distance, 4)}`)")
                     st.code(h.text, language="markdown")
                 if conflicts:
-                    st.warning("⚠️ Conflict Detected across dated sources above!")
+                    st.warning("âš ï¸� Conflict Detected across dated sources above!")
 
             # Audit log
             try:
@@ -997,16 +1003,16 @@ with tab_copilot:
             msg_index = len(st.session_state.history)
             col_act1, col_act2 = st.columns([1, 1])
             with col_act1:
-                if st.button("⚡ Convert to CRM Ticket", key=f"crm_conv_{msg_index}", type="primary", use_container_width=True):
+                if st.button("âš¡ Convert to CRM Ticket", key=f"crm_conv_{msg_index}", type="primary", use_container_width=True):
                     st.session_state.last_context = {
                         "query": query, "answer": answer,
                         "hits": [{"text": h.text, "citation": h.citation} for h in hits],
                         "conflicts": [{"topic": c["topic"], "trusted": c["trusted"].citation} for c in conflicts],
                     }
                     st.session_state.crm_notice = True
-                    st.success("✓ Copilot response transferred to CRM Ticket Studio! Switch to the ◈ CRM STUDIO tab to finalize.")
+                    st.success("✓“ Copilot response transferred to CRM Ticket Studio! Switch to the ◈ CRM STUDIO tab to finalize.")
             with col_act2:
-                if st.button("⚑ Flag as Incorrect", key=f"flag-{msg_index}", use_container_width=True):
+                if st.button("âš‘ Flag as Incorrect", key=f"flag-{msg_index}", use_container_width=True):
                     try:
                         from audit import log_qa_event
                         log_qa_event(f"[FLAGGED] {query}", answer, hits, conflicts)
@@ -1022,7 +1028,7 @@ with tab_copilot:
             }
 
 
-# ── TAB 2: DOCUMENTS (LIFECYCLE MANAGEMENT) ──────────────────────────────────
+# â”€â”€ TAB 2: DOCUMENTS (LIFECYCLE MANAGEMENT) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 with tab_docs:
     st.markdown('<div class="nx-section-label">Document Repository & Index Management</div>', unsafe_allow_html=True)
     st.caption("Manage ingested business records, view index status, and delete outdated source files.")
@@ -1032,7 +1038,7 @@ with tab_docs:
     if not all_docs:
         st.markdown("""
 <div style="text-align:center;padding:56px 0;">
-  <div style="font-size:3rem;margin-bottom:14px;">📂</div>
+  <div style="font-size:3rem;margin-bottom:14px;">ðŸ“‚</div>
   <div style="font-family:'Orbitron',sans-serif;font-size:0.85rem;color:#6d28d9;letter-spacing:0.15em;margin-bottom:8px;">EMPTY KNOWLEDGE BASE</div>
   <div style="font-size:0.88rem;color:#4b5563;max-width:380px;margin:0 auto;line-height:1.7;">
     No documents have been ingested yet.<br>Use the <strong style="color:#a78bfa;">📤 Upload</strong> panel in the sidebar to add PDFs, Excel workbooks, or email files.
@@ -1043,7 +1049,7 @@ with tab_docs:
         # Search & filter bar
         col_search, col_filter = st.columns([3, 1])
         with col_search:
-            search_term = st.text_input("🔍 Search documents...", key="doc_search", placeholder="Filter by document name or keyword...").strip().lower()
+            search_term = st.text_input("ðŸ”� Search documents...", key="doc_search", placeholder="Filter by document name or keyword...").strip().lower()
         with col_filter:
             doc_type_filter = st.selectbox("Type Filter", ["All", "PDF", "Excel", "Email"], key="doc_filter")
 
@@ -1071,7 +1077,7 @@ with tab_docs:
                     st.markdown(f"**Document Date:**")
                     st.caption(f"`{doc['date']}`")
                 with cols[4]:
-                    if st.button("🗑 Delete File", key=f"del_doc_{idx}_{doc['name']}", type="secondary", use_container_width=True):
+                    if st.button("🗑️ Delete File", key=f"del_doc_{idx}_{doc['name']}", type="secondary", use_container_width=True):
                         # Delete vector embeddings from ChromaDB
                         chunks_deleted = delete_document_from_index(doc["name"])
                         # Remove file from disk
@@ -1086,7 +1092,7 @@ with tab_docs:
 
                 col_exp1, col_exp2 = st.columns(2)
                 with col_exp1:
-                    with st.expander(f"📖 File Text Preview ({doc['name']})"):
+                    with st.expander(f"ðŸ“– File Text Preview ({doc['name']})"):
                         try:
                             if doc["name"].endswith(".pdf"):
                                 from pypdf import PdfReader
@@ -1107,7 +1113,7 @@ with tab_docs:
                             st.caption(f"Preview unavailable: {p_err}")
 
                 with col_exp2:
-                    with st.expander(f"👁 Vector Chunks ({doc['name']})"):
+                    with st.expander(f"ðŸ‘� Vector Chunks ({doc['name']})"):
                         chunks = get_document_chunks(doc["name"])
                         if not chunks:
                             st.caption("No vector chunks found in ChromaDB.")
@@ -1123,16 +1129,16 @@ with tab_docs:
 
                 st.divider()
 
-        st.markdown('<div class="nx-section-label">⚡ Proactive Policy Conflict Scanner</div>', unsafe_allow_html=True)
+        st.markdown('<div class="nx-section-label">âš¡ Proactive Policy Conflict Scanner</div>', unsafe_allow_html=True)
         st.caption("Perform a proactive full-database scan to identify all active policy contradictions across your knowledge base.")
 
-        if st.button("🔎 Scan Entire Knowledge Base for Conflicts", key="btn_scan_all_conflicts", use_container_width=False):
+        if st.button("ðŸ”Ž Scan Entire Knowledge Base for Conflicts", key="btn_scan_all_conflicts", use_container_width=False):
             with st.spinner("Scanning all indexed documents..."):
                 active_conflicts = scan_all_conflicts()
                 if not active_conflicts:
-                    st.success("✅ Clean Knowledge Base: Zero contradictions detected across indexed documents!")
+                    st.success("✓… Clean Knowledge Base: Zero contradictions detected across indexed documents!")
                 else:
-                    st.warning(f"⚠️ Detected {len(active_conflicts)} active policy conflict(s) across your documents:")
+                    st.warning(f"âš ï¸� Detected {len(active_conflicts)} active policy conflict(s) across your documents:")
                     # B3: Dispatch webhook for proactive scan results
                     try:
                         from audit import _dispatch_webhook
@@ -1161,23 +1167,23 @@ with tab_docs:
                         """, unsafe_allow_html=True)
 
 
-# ── TAB 3: CRM STUDIO ─────────────────────────────────────────────────────────
+# â”€â”€ TAB 3: CRM STUDIO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 with tab_crm:
     st.markdown('<div class="nx-section-label">CRM Support Ticket Generator</div>', unsafe_allow_html=True)
     st.caption("Auto-populate customer support tickets from Nexa's cited answers.")
 
     if st.session_state.get("crm_notice"):
-        st.success("⚡ Active Context Transferred from AI Copilot — Ticket pre-populated below.")
+        st.success("âš¡ Active Context Transferred from AI Copilot —” Ticket pre-populated below.")
         st.session_state.crm_notice = False
 
     ctx = st.session_state.last_context
     if ctx:
-        st.info(f"📌 **Active Ticket Source Context:** \"{ctx['query']}\" ({len(ctx['hits'])} cited document sources)")
+        st.info(f"ðŸ“Œ **Active Ticket Source Context:** \"{ctx['query']}\" ({len(ctx['hits'])} cited document sources)")
     col1, col2 = st.columns(2)
 
     with col1:
         subject = st.text_input("Ticket Subject", value=(ctx["query"] if ctx else ""), placeholder="e.g. Refund policy dispute")
-        # Smart client detection — not hardcoded to Acme
+        # Smart client detection —” not hardcoded to Acme
         auto_client = _detect_client(ctx["query"]) if ctx else ""
         client = st.text_input("Client Name", value=auto_client, placeholder="e.g. Acme Corp")
         priority = st.selectbox("Priority Level", ["Low", "Medium", "High", "Urgent"], index=1)
@@ -1194,7 +1200,7 @@ with tab_crm:
             )
         body = st.text_area("Ticket Response Body", value=body_default, height=200, placeholder="Describe the issue and resolution...")
 
-    if st.button("Create CRM Ticket ⟶", type="primary", use_container_width=False):
+    if st.button("Create CRM Ticket âŸ¶", type="primary", use_container_width=False):
         if not subject.strip():
             st.warning("Please enter a ticket subject.")
         else:
@@ -1208,10 +1214,10 @@ with tab_crm:
             }
             st.markdown(f"""
 <div class="nx-ticket">
-  <div class="nx-ticket-badge">✓ TICKET CREATED</div>
+  <div class="nx-ticket-badge">✓“ TICKET CREATED</div>
   <div style="font-family:'Orbitron',sans-serif;font-size:1rem;color:#34d399;margin-bottom:4px;">{ticket['id']}</div>
-  <div style="font-size:0.8rem;color:#6b7280;">Priority: {priority} · Type: {ticket_type}</div>
-  <div style="font-size:0.8rem;color:#6b7280;margin-top:4px;">Ready to sync · HubSpot / Zendesk / Salesforce</div>
+  <div style="font-size:0.8rem;color:#6b7280;">Priority: {priority} Â· Type: {ticket_type}</div>
+  <div style="font-size:0.8rem;color:#6b7280;margin-top:4px;">Ready to sync Â· HubSpot / Zendesk / Salesforce</div>
 </div>
             """, unsafe_allow_html=True)
             
@@ -1243,7 +1249,7 @@ with tab_crm:
                 st.json(ticket)
 
 
-# ── TAB 3: ANALYTICS ──────────────────────────────────────────────────────────
+# â”€â”€ TAB 3: ANALYTICS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 with tab_analytics:
     st.markdown('<div class="nx-section-label">Knowledge Base Analytics & Audit Log</div>', unsafe_allow_html=True)
 
@@ -1290,7 +1296,7 @@ with tab_analytics:
         st.bar_chart(doc_counts, color="#7c3aed")
         
     with col_chart2:
-        st.caption("⚡ Resolution & Conflict Rates")
+        st.caption("âš¡ Resolution & Conflict Rates")
         normal_queries = max(0, len(audit_entries) - conflict_count - flagged)
         resolution_counts = pd.DataFrame({
             "Category": ["Direct Answers", "Conflicts Detected", "Flagged Queries"],
@@ -1341,14 +1347,14 @@ with tab_analytics:
             has_conflict = bool(entry.get("conflicts_detected"))
             is_flagged = q.startswith("[FLAGGED]")
 
-            conflict_tag = '<span class="nx-audit-conflict-tag">⚠ CONFLICT</span>' if has_conflict else ""
-            flagged_tag = '<span class="nx-audit-conflict-tag" style="background:rgba(251,146,60,0.1);color:#fbbf24;border-color:rgba(251,146,60,0.28);">⚑ FLAGGED</span>' if is_flagged else ""
-            short_q = html.escape(q[:80]) + ("…" if len(q) > 80 else "")
-            short_a = html.escape(entry.get("answer", "")[:120]) + "…"
+            conflict_tag = '<span class="nx-audit-conflict-tag">âš  CONFLICT</span>' if has_conflict else ""
+            flagged_tag = '<span class="nx-audit-conflict-tag" style="background:rgba(251,146,60,0.1);color:#fbbf24;border-color:rgba(251,146,60,0.28);">âš‘ FLAGGED</span>' if is_flagged else ""
+            short_q = html.escape(q[:80]) + ("—¦" if len(q) > 80 else "")
+            short_a = html.escape(entry.get("answer", "")[:120]) + "—¦"
 
             st.markdown(f"""
 <div class="nx-audit-entry">
-  <div class="nx-audit-time">🕐 {ts}</div>
+  <div class="nx-audit-time">ðŸ•� {ts}</div>
   <div class="nx-audit-query">{short_q}</div>
   <div style="font-size:0.78rem;color:#4b5563;-webkit-text-fill-color:#4b5563;margin-top:4px;">{short_a}</div>
   <div style="margin-top:6px;">{conflict_tag}{flagged_tag}</div>
@@ -1357,7 +1363,7 @@ with tab_analytics:
     else:
         st.markdown("""
 <div style="text-align:center;padding:48px 0;color:#374151;">
-  <div style="font-size:2.5rem;margin-bottom:12px;">📭</div>
+  <div style="font-size:2.5rem;margin-bottom:12px;">ðŸ“­</div>
   <div style="font-family:'Orbitron',sans-serif;font-size:0.8rem;color:#4b5563;letter-spacing:0.12em;">NO QUERIES YET</div>
   <div style="font-size:0.85rem;color:#374151;margin-top:8px;">Ask a question in the AI Copilot tab to see analytics here.</div>
 </div>
