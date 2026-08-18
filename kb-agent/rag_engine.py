@@ -185,12 +185,12 @@ def detect_conflicts(hits):
         (discontinued, non-refundable, no fee, early payment, restocking fee, store credit) so conflict
         detection catches both quantitative and qualitative policy contradictions in real documents."""
         low = text.lower()
-        # Extract numbers, currency, percentages, payment terms, time windows
+        # Extract numbers, currency, percentages, payment terms, time windows (supporting hyphens e.g. 18-month, 12-month)
         raw = re.findall(
-            r"\d+%\b|\$\d+(?:\.\d+)?\b|net\s*\d+\b|\d+\s*(?:day|month|year|hour|business hour|min)s?\b",
+            r"\d+%\b|\$\d+(?:\.\d+)?\b|net\s*\d+\b|\d+[- ]*(?:day|month|year|hour|business hour|min)s?\b",
             low
         )
-        facts = {re.sub(r"\s+", "", f) for f in raw}
+        facts = {re.sub(r"[- ]+", "", f) for f in raw}
 
         qualitative_signals = [
             "non-refundable", "non refundable", "refundable", "no fee",

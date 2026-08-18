@@ -185,11 +185,13 @@ def test_csv_ingestion_pipeline(tmp_path, monkeypatch):
 def test_generate_answer_with_conflict_resolution():
     r_old = RetrievalResult(
         text="Net 45 terms are available for Acme Corp. $0 fee.",
-        metadata={"source_name": "email_old.txt", "source_type": "email", "section": "chunk 1", "doc_date": "2024-11-03", "topic": "acme_terms"}
+        metadata={"source_name": "email_old.txt", "source_type": "email", "section": "chunk 1", "doc_date": "2024-11-03", "topic": "acme_terms"},
+        distance=0.15
     )
     r_new = RetrievalResult(
         text="Effective Dec 1 2024, Acme Corp terms are Net 14 days with 10% fee.",
-        metadata={"source_name": "policy_v2.pdf", "source_type": "pdf", "section": "Section 2", "doc_date": "2024-12-01", "topic": "acme_terms"}
+        metadata={"source_name": "policy_v2.pdf", "source_type": "pdf", "section": "Section 2", "doc_date": "2024-12-01", "topic": "acme_terms"},
+        distance=0.08
     )
 
     conflicts = detect_conflicts([r_new, r_old])

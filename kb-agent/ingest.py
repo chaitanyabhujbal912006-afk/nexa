@@ -67,6 +67,11 @@ def parse_date_string(date_str):
     if iso_match:
         return iso_match.group(1)
 
+    # Handle dotted ISO format e.g. 2024.11.03
+    dot_match = re.match(r"^(\d{4})\.(\d{2})\.(\d{2})$", s_val)
+    if dot_match:
+        return f"{dot_match.group(1)}-{dot_match.group(2)}-{dot_match.group(3)}"
+
     # Handle PDF metadata format e.g. D:20241201120000Z
     pdf_match = re.match(r"D:(\d{4})(\d{2})(\d{2})", s_val)
     if pdf_match:
