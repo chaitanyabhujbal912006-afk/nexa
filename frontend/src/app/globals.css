@@ -1,47 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
 @import "tailwindcss";
 
 @layer base {
   :root {
     --font-inter: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-geist: 'Geist', 'Space Grotesk', sans-serif;
     --font-space: 'Space Grotesk', sans-serif;
-    --font-mono: 'Fira Code', monospace;
+    --font-mono: 'Geist', 'Fira Code', monospace;
 
-    /* Lutra UI & Glassmorphism Theme Variables */
-    --glass-bg: rgba(15, 23, 42, 0.75);
-    --glass-card: rgba(30, 41, 59, 0.6);
-    --glass-card-hover: rgba(51, 65, 85, 0.7);
-    --glass-border: rgba(255, 255, 255, 0.08);
-    --glass-border-glow: rgba(99, 102, 241, 0.35);
+    /* Obsidian Kinetic Color Palette */
+    --obsidian-bg: #0c1324;
+    --obsidian-surface: #151b2d;
+    --obsidian-container: #191f31;
+    --obsidian-container-high: #23293c;
+    --obsidian-container-highest: #2e3447;
+    --obsidian-border: #424754;
+    --obsidian-primary: #adc6ff;
+    --obsidian-secondary: #c0c1ff;
+    --obsidian-tertiary: #4cd7f6;
+    --obsidian-on-surface: #dce1fb;
 
-    --color-primary: #6366f1;
-    --color-primary-hover: #4f46e5;
-    --color-accent: #10b981;
+    /* Glassmorphism Theme Variables */
+    --glass-bg: rgba(12, 19, 36, 0.65);
+    --glass-card: rgba(25, 31, 49, 0.7);
+    --glass-card-hover: rgba(35, 41, 60, 0.85);
+    --glass-border: rgba(66, 71, 84, 0.6);
+    --glass-border-glow: rgba(173, 198, 255, 0.4);
+
+    --color-primary: #adc6ff;
+    --color-primary-hover: #4d8eff;
+    --color-accent: #4cd7f6;
     --color-amber: #f59e0b;
-    --color-rose: #f43f5e;
+    --color-rose: #ffb4ab;
   }
 }
 
 body {
-  background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, #0f172a 45%, #020617 100%);
-  color: #f8fafc;
+  background-color: var(--obsidian-bg);
+  color: var(--obsidian-on-surface);
   font-family: var(--font-inter);
   min-height: 100vh;
   overflow-x: hidden;
 }
 
+/* Material Symbols Class */
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+}
+
 /* Glassmorphism Panels */
 .glass-panel {
   background: var(--glass-bg);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
   border: 1px solid var(--glass-border);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .glass-card {
   background: var(--glass-card);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--glass-border);
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -50,55 +81,68 @@ body {
   background: var(--glass-card-hover);
   border-color: var(--glass-border-glow);
   transform: translateY(-2px);
-  box-shadow: 0 12px 32px rgba(99, 102, 241, 0.15);
+  box-shadow: 0 12px 32px rgba(77, 142, 255, 0.15);
 }
 
 .glass-button {
-  background: rgba(99, 102, 241, 0.15);
-  border: 1px solid rgba(99, 102, 241, 0.3);
-  color: #c7d2fe;
+  background: rgba(77, 142, 255, 0.15);
+  border: 1px solid rgba(173, 198, 255, 0.3);
+  color: #d8e2ff;
   backdrop-filter: blur(12px);
   transition: all 0.2s ease;
 }
 
 .glass-button:hover {
-  background: rgba(99, 102, 241, 0.3);
-  border-color: rgba(99, 102, 241, 0.6);
+  background: rgba(77, 142, 255, 0.3);
+  border-color: rgba(173, 198, 255, 0.6);
   color: #ffffff;
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 0 20px rgba(77, 142, 255, 0.3);
 }
 
 .glass-input {
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(12, 19, 36, 0.7);
+  border: 1px solid rgba(66, 71, 84, 0.8);
   backdrop-filter: blur(12px);
-  color: #f8fafc;
+  color: #dce1fb;
   transition: all 0.2s ease;
 }
 
 .glass-input:focus {
-  border-color: rgba(99, 102, 241, 0.6);
-  box-shadow: 0 0 24px rgba(99, 102, 241, 0.25);
+  border-color: rgba(173, 198, 255, 0.8);
+  box-shadow: 0 0 24px rgba(77, 142, 255, 0.25);
   outline: none;
+}
+
+/* Technical Accent Lines & Glowing Borders */
+.kinetic-border {
+  position: relative;
+}
+.kinetic-border::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(173, 198, 255, 0.5), transparent 60%, rgba(76, 215, 246, 0.3));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }
 
 /* Neon & Text Gradients */
 .gradient-text {
-  background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 40%, #818cf8 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #adc6ff 50%, #4cd7f6 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .neon-glow {
-  box-shadow: 0 0 25px rgba(99, 102, 241, 0.35);
+  box-shadow: 0 0 25px rgba(77, 142, 255, 0.35);
 }
 
-.neon-glow-emerald {
-  box-shadow: 0 0 25px rgba(16, 185, 129, 0.35);
-}
-
-.neon-glow-amber {
-  box-shadow: 0 0 25px rgba(245, 158, 11, 0.35);
+.neon-glow-cyan {
+  box-shadow: 0 0 25px rgba(76, 215, 246, 0.35);
 }
 
 /* Custom Scrollbar */
@@ -107,14 +151,14 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.5);
+  background: rgba(12, 19, 36, 0.8);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(99, 102, 241, 0.3);
+  background: rgba(66, 71, 84, 0.8);
   border-radius: 100px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.6);
+  background: rgba(173, 198, 255, 0.5);
 }
 
 /* Animations */
