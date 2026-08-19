@@ -201,6 +201,27 @@ class TestDocuments:
         data = res.json()
         assert "documents" in data
 
+    def test_delete_document(self, client):
+        with (
+            patch("os.path.isfile", return_value=True),
+            patch("os.remove", return_value=None),
+        ):
+            res = client.delete("/api/v1/documents/test_doc.pdf")
+            assert res.status_code == 200
+            data = res.json()
+            assert data["status"] == "deleted"
+            assert data["document"] == "test_doc.pdf"
+            assert data["vector_chunks_removed"] == 3
+
+
+class TestConflicts:
+    def test_conflicts_endpoint(self, client):
+        res = client.get("/api/v1/conflicts")
+        assert res.status_code == 200
+        data = res.json()
+        assert "conflicts_count" in data
+        assert "conflicts" in data
+
 
 class TestAudit:
     def test_audit_endpoint(self, client):

@@ -61,7 +61,7 @@ logger = logging.getLogger("nexa.api")
 # ── Environment & Secrets ────────────────────────────────────────────────────
 load_secrets()
 _NEXA_API_KEY = os.environ.get("NEXA_API_KEY", "")
-JWT_SECRET = os.environ.get("JWT_SECRET", "nexa-cyber-secret-key-2026-v3")
+JWT_SECRET = os.environ.get("JWT_SECRET", "nexa-cyber-secret-key-2026-v3-enterprise-sovereign-production-key")
 JWT_ALGORITHM = "HS256"
 
 _ALLOWED_ORIGINS = [
