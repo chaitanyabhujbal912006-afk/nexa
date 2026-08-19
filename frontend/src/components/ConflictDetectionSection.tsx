@@ -1,164 +1,117 @@
 import React, { useState } from 'react';
-import {
-  FileText,
-  AlertTriangle,
-  Check,
-  ShieldCheck,
-  Calendar,
-  ArrowRightLeft,
-} from 'lucide-react';
-import { CONFLICT_RECORDS } from '../data/mockKnowledge';
+import { AlertTriangle, CheckCircle2, Gavel, ShieldCheck, Calendar, CheckCheck, FileText, ArrowRight, Shield } from 'lucide-react';
+import { CONFLICT_PRESETS } from '../data/mockKnowledge';
+import { playTactileClick } from '../utils/audio';
 
-interface ConflictDetectionSectionProps {
-  onInspectDoc?: (docName: string) => void;
-}
-
-export const ConflictDetectionSection: React.FC<ConflictDetectionSectionProps> = ({
-  onInspectDoc,
-}) => {
-  const [selectedConflictIndex, setSelectedConflictIndex] = useState(0);
-  const currentConflict = CONFLICT_RECORDS[selectedConflictIndex] || CONFLICT_RECORDS[0];
+export const ConflictDetectionSection: React.FC = () => {
+  const [selectedPresetIndex, setSelectedPresetIndex] = useState(0);
+  const current = CONFLICT_PRESETS[selectedPresetIndex];
 
   return (
-    <section
-      id="conflict-detection-section"
-      className="w-full flex flex-col items-center gap-12 pt-16"
-    >
-      {/* Title */}
-      <div className="text-center flex flex-col gap-4 max-w-3xl px-4">
-        <span className="text-[#D4D4D4] text-[10px] uppercase tracking-[0.4em] font-medium font-sans">
-          Temporal Reconciliation
+    <section id="conflict-section" className="w-full flex flex-col items-center gap-8 pt-8">
+      {/* Heading with Cursive Accent (Zero Font Clipping) */}
+      <div className="text-center flex flex-col gap-2 max-w-3xl px-4 relative overflow-visible">
+        <span className="font-cursive text-3xl sm:text-4xl text-[#c084fc] font-bold mb-0.5 drop-shadow-[0_0_12px_rgba(192,132,252,0.5)] overflow-visible">
+          Conflict Detection & Arbitration
         </span>
-        <h2 className="text-3xl sm:text-5xl lg:text-[56px] leading-[1.05] font-serif text-white">
-          Don&apos;t just find an answer.
+        <h2 className="font-syne text-3xl sm:text-5xl lg:text-[56px] lg:leading-[64px] font-extrabold text-[#f8fafc] tracking-[-0.035em] overflow-visible pb-1">
+          Don't just find an answer.
           <br />
-          <span className="italic font-light text-[#D4D4D4]">Know which answer is right.</span>
+          <span className="text-gradient-lime">
+            Know which answer is right.
+          </span>
         </h2>
+        <span className="font-cursive text-2xl sm:text-3xl text-[#bef264] font-bold mt-1 overflow-visible">
+          automatic timestamp overrides
+        </span>
       </div>
 
-      {/* Main Conflict Resolution Architectural Plate */}
-      <div className="w-full max-w-5xl bg-[#121212] border border-[#262626] p-6 sm:p-10 shadow-2xl relative">
-        {/* Architectural corner crosshair */}
-        <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#404040] to-transparent"></div>
+      {/* Preset Selector */}
+      <div className="flex flex-wrap items-center justify-center gap-2.5 max-w-2xl px-4">
+        {CONFLICT_PRESETS.map((preset, idx) => (
+          <button
+            key={preset.title}
+            onClick={() => {
+              playTactileClick();
+              setSelectedPresetIndex(idx);
+            }}
+            className={`font-sans text-xs font-bold px-4 py-2.5 rounded-full border transition-all cursor-pointer ${
+              selectedPresetIndex === idx
+                ? 'bg-[#bef264] text-[#090d1a] border-[#bef264] shadow-[0_0_20px_rgba(190,242,100,0.5)] scale-105'
+                : 'apple-glass-pill text-white/80 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            {preset.title}
+          </button>
+        ))}
+      </div>
 
-        {/* Conflict topic selector tabs */}
-        <div className="flex items-center justify-between gap-4 mb-8 pb-6 border-b border-[#262626] flex-wrap">
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-[#737373] font-sans">
-            <ArrowRightLeft className="w-3.5 h-3.5 text-[#A3A3A3]" />
-            <span>Case Study:</span>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            {CONFLICT_RECORDS.map((c, idx) => (
-              <button
-                key={c.id}
-                onClick={() => setSelectedConflictIndex(idx)}
-                className={`text-[10px] uppercase tracking-[0.2em] px-4 py-2 transition-all cursor-pointer ${
-                  selectedConflictIndex === idx
-                    ? 'bg-white text-black font-medium border border-white'
-                    : 'bg-[#0A0A0A] text-[#737373] border border-[#262626] hover:text-white hover:border-[#404040]'
-                }`}
-              >
-                {c.topic}
-              </button>
-            ))}
-          </div>
-        </div>
+      {/* Conflict Resolution Box */}
+      <div className="w-full max-w-5xl apple-glass-card rounded-[32px] p-6 sm:p-8 relative overflow-visible shadow-2xl border border-white/20">
+        {/* Top Accent line */}
+        <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-[#ef4444] via-[#bef264] to-[#38bdf8] rounded-t-[32px]"></div>
 
-        {/* Side by side comparison: Outdated vs Active */}
         <div className="grid md:grid-cols-2 gap-6 lg:gap-8 relative z-10">
-          {/* Old Policy Card */}
-          <div
-            id="outdated-source-card"
-            onClick={() => onInspectDoc?.(currentConflict.outdatedSource.docName)}
-            className="bg-[#0A0A0A] border border-[#262626] p-6 relative hover:border-[#404040] transition-all cursor-pointer group flex flex-col justify-between"
-          >
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center gap-2 text-[#737373] group-hover:text-white transition-colors">
-                  <FileText className="w-3.5 h-3.5 text-[#A3A3A3]" />
-                  <span className="text-xs font-sans font-medium">
-                    {currentConflict.outdatedSource.docName}
-                  </span>
-                </div>
-                <span className="text-[9px] uppercase tracking-[0.25em] text-[#737373] border border-[#262626] px-2 py-0.5 font-mono">
-                  Outdated Source
-                </span>
-              </div>
-
-              <p className="text-sm font-serif italic text-[#737373] line-through decoration-[#525252] leading-relaxed my-4">
-                {currentConflict.outdatedSource.snippet}
-              </p>
+          {/* Outdated Policy */}
+          <div className="bg-[#090e1f] rounded-2xl p-6 border border-[#ef4444]/30 relative transition-all">
+            <div className="absolute -top-3.5 right-4 bg-[#ef4444] text-white px-3 py-0.5 rounded-full font-mono text-[10px] font-bold uppercase flex items-center gap-1.5 shadow-[0_0_10px_rgba(239,68,68,0.5)]">
+              <AlertTriangle className="w-3 h-3" />
+              <span>OUTDATED RECORD</span>
             </div>
 
-            <div className="pt-4 border-t border-[#262626] flex justify-between items-center text-[#525252] text-[9px] uppercase tracking-[0.2em] font-mono">
-              <span>Date: {currentConflict.outdatedSource.date}</span>
-              <span>Conf: {currentConflict.outdatedSource.confidence}%</span>
+            <div className="flex items-center gap-2 mb-4 text-[#94a3b8] font-mono text-xs">
+              <FileText className="w-4 h-4 text-[#f87171]" />
+              <span className="font-bold text-white">{current.oldDoc}</span>
+              <span className="text-[#64748b]">•</span>
+              <span className="text-[#f87171]">{current.oldDate}</span>
+            </div>
+
+            <p className="font-sans text-sm sm:text-base text-[#cbd5e1] leading-relaxed mb-4 p-3.5 rounded-xl bg-white/5 border border-white/10">
+              "{current.oldClaim}"
+            </p>
+
+            <div className="flex items-center gap-2 font-mono text-xs text-[#f87171]">
+              <span className="w-2 h-2 rounded-full bg-[#ef4444]" />
+              <span>SUPERSEDED BY REVISION // VOID ({current.oldConf}% CONF)</span>
             </div>
           </div>
 
-          {/* Active Policy Card */}
-          <div
-            id="active-policy-card"
-            onClick={() => onInspectDoc?.(currentConflict.activeSource.docName)}
-            className="bg-[#171717] border border-[#404040] p-6 relative hover:border-white transition-all cursor-pointer group flex flex-col justify-between"
-          >
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center gap-2 text-white">
-                  <FileText className="w-3.5 h-3.5 text-white" />
-                  <span className="text-xs font-sans font-medium">
-                    {currentConflict.activeSource.docName}
-                  </span>
-                </div>
-                <span className="text-[9px] uppercase tracking-[0.25em] bg-white text-black font-medium px-2 py-0.5 font-mono">
-                  Active Enforced
-                </span>
-              </div>
-
-              <p className="text-sm font-serif italic text-white leading-relaxed my-4">
-                {currentConflict.activeSource.snippet}
-              </p>
+          {/* Active Verified Policy */}
+          <div className="bg-[#090e1f] rounded-2xl p-6 border border-[#bef264]/40 relative transition-all shadow-[0_0_30px_rgba(190,242,100,0.1)]">
+            <div className="absolute -top-3.5 right-4 bg-gradient-to-r from-[#bef264] to-[#a3e635] text-[#090d1a] px-3 py-0.5 rounded-full font-mono text-[10px] font-bold uppercase flex items-center gap-1.5 shadow-[0_0_12px_rgba(190,242,100,0.6)]">
+              <CheckCircle2 className="w-3 h-3" />
+              <span>ACTIVE ENFORCEABLE RECORD</span>
             </div>
 
-            <div className="pt-4 border-t border-[#262626] flex justify-between items-center text-[#A3A3A3] text-[9px] uppercase tracking-[0.2em] font-mono">
-              <span>Date: {currentConflict.activeSource.date}</span>
-              <span className="text-white">Conf: {currentConflict.activeSource.confidence}%</span>
+            <div className="flex items-center gap-2 mb-4 text-[#94a3b8] font-mono text-xs">
+              <FileText className="w-4 h-4 text-[#bef264]" />
+              <span className="font-bold text-white">{current.newDoc}</span>
+              <span className="text-[#64748b]">•</span>
+              <span className="text-[#bef264]">{current.newDate}</span>
+            </div>
+
+            <p className="font-sans text-sm sm:text-base text-white leading-relaxed mb-4 p-3.5 rounded-xl bg-white/5 border border-[#bef264]/30 font-medium">
+              "{current.newClaim}"
+            </p>
+
+            <div className="flex items-center gap-2 font-mono text-xs text-[#bef264]">
+              <CheckCheck className="w-4 h-4" />
+              <span>GOVERNING LEGAL PRECEDENCE APPLIED ({current.newConf}% CONF)</span>
             </div>
           </div>
         </div>
 
-        {/* Verdict Banner */}
-        <div className="mt-8 bg-[#0A0A0A] border border-[#262626] p-6 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-6">
-          <div className="space-y-1">
-            <div className="text-[9px] uppercase tracking-[0.3em] text-[#737373] font-mono">
-              Observation:
-            </div>
-            <p className="text-xs text-[#A3A3A3] font-light">
-              {currentConflict.conflictDescription}
-            </p>
+        {/* Arbitration Footer */}
+        <div className="mt-6 pt-5 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-mono text-xs text-[#94a3b8]">
+          <div className="flex items-center gap-2 text-white">
+            <Gavel className="w-4 h-4 text-[#bef264]" />
+            <span>ARBITRATION VERDICT: <strong className="text-[#bef264] font-sans font-bold">{current.verdict}</strong></span>
           </div>
 
-          <div className="md:border-l border-[#262626] md:pl-6 space-y-1">
-            <div className="text-[9px] uppercase tracking-[0.3em] text-white font-mono">
-              {currentConflict.verdict}:
-            </div>
-            <p className="text-xs font-serif italic text-white">
-              {currentConflict.verdictReason}
-            </p>
+          <div className="flex items-center gap-2 text-[#38bdf8]">
+            <ShieldCheck className="w-4 h-4" />
+            <span>CONFIDENCE SCORE: <strong>99.4%</strong></span>
           </div>
-        </div>
-
-        {/* Verification Status Badges */}
-        <div className="flex flex-wrap gap-4 mt-8 justify-center items-center">
-          <span className="border border-[#262626] bg-[#0A0A0A] px-4 py-2 text-[9px] uppercase tracking-[0.25em] text-[#737373] flex items-center gap-2">
-            <ShieldCheck className="w-3.5 h-3.5 text-[#A3A3A3]" /> Source Verified
-          </span>
-          <span className="border border-[#262626] bg-[#0A0A0A] px-4 py-2 text-[9px] uppercase tracking-[0.25em] text-[#737373] flex items-center gap-2">
-            <Calendar className="w-3.5 h-3.5 text-[#A3A3A3]" /> Temporal Order Confirmed
-          </span>
-          <span className="border border-[#262626] bg-[#0A0A0A] px-4 py-2 text-[9px] uppercase tracking-[0.25em] text-[#737373] flex items-center gap-2">
-            <Check className="w-3.5 h-3.5 text-[#A3A3A3]" /> Conflict Reconciled
-          </span>
         </div>
       </div>
     </section>

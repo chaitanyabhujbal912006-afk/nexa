@@ -1,5 +1,6 @@
 import React from 'react';
-import { X, Network, Cpu, Database, Lock, Zap } from 'lucide-react';
+import { X, ShieldCheck, Database, Lock, Cpu, CheckCircle2, Key, Radio, Layers, Server } from 'lucide-react';
+import { playTactileClick } from '../utils/audio';
 
 interface ArchitectureModalProps {
   isOpen: boolean;
@@ -9,111 +10,113 @@ interface ArchitectureModalProps {
 export const ArchitectureModal: React.FC<ArchitectureModalProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
-  const stackLayers = [
-    {
-      layer: 'Ingress & Normalization Layer',
-      icon: Network,
-      items: ['Multi-protocol parsers (PDF, EML, XLSX, DOCX, DB)', 'Real-time OCR & Layout Reconstruction', 'Sub-second chunking with contextual embeddings'],
-    },
-    {
-      layer: 'Temporal Conflict & Topology Engine',
-      icon: Zap,
-      items: ['Timeline extraction & supersession graph', 'Contradiction detection across cross-silo documents', 'Automated arbitration scoring & confidence indexing'],
-    },
-    {
-      layer: 'Hybrid Graph-Vector Storage Layer',
-      icon: Database,
-      items: ['HNSW Vector Index with 1536-dim embeddings', 'Enterprise Knowledge Graph with entity relation mapping', 'Cryptographic provenance logging with SHA-256 tamper seals'],
-    },
-    {
-      layer: 'Zero-Trust Security & Privacy Sandbox',
-      icon: Lock,
-      items: ['In-flight PII & secret token masking', 'Isolated VPC / Private Cloud tenant boundaries', 'RBAC & Document-level permission enforcement'],
-    },
-  ];
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#050505]/90 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="relative w-full max-w-3xl bg-[#0A0A0A] border border-[#262626] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="apple-glass-card rounded-[28px] border border-white/20 shadow-2xl max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden text-white relative">
         {/* Header */}
-        <div className="p-6 border-b border-[#262626] flex items-center justify-between bg-[#121212]">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 border border-[#333] flex items-center justify-center text-white bg-[#0A0A0A]">
-              <Cpu className="w-4 h-4" />
+        <div className="p-6 border-b border-white/10 flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-[#7c3aed]/20 border border-[#a855f7]/40 flex items-center justify-center text-[#c084fc]">
+              <Server className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-serif text-white">NEXA Architecture Specification</h3>
-              <p className="text-[10px] uppercase tracking-[0.2em] text-[#737373]">Technical Topology & Provenance Blueprint</p>
+              <h3 className="font-display font-bold text-lg text-white">
+                NEXA System Architecture & Compliance Inspector
+              </h3>
+              <p className="font-mono text-xs text-[#94a3b8]">
+                ENTERPRISE TOPOLOGY // CRYPTOGRAPHIC ISOLATION MATRIX
+              </p>
             </div>
           </div>
 
           <button
-            onClick={onClose}
-            className="text-[#737373] hover:text-white p-2 border border-transparent hover:border-[#333] transition-colors cursor-pointer"
+            onClick={() => {
+              playTactileClick();
+              onClose();
+            }}
+            className="p-2 rounded-full hover:bg-white/10 text-[#94a3b8] hover:text-white transition-all cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6 sm:p-8 overflow-y-auto space-y-6">
-          <div className="grid sm:grid-cols-2 gap-4">
-            {stackLayers.map((sl, idx) => {
-              const Icon = sl.icon;
-              return (
-                <div
-                  key={idx}
-                  className="p-5 bg-[#0F0F0F] border border-[#262626] flex flex-col gap-3"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Icon className="w-4 h-4 text-[#A3A3A3]" />
-                    <h4 className="text-xs font-sans font-medium text-white uppercase tracking-[0.1em]">
-                      {sl.layer}
-                    </h4>
+        <div className="p-6 overflow-y-auto space-y-6 flex-1 custom-scrollbar">
+          {/* Compliance Badges */}
+          <div className="space-y-2">
+            <span className="font-mono text-[10px] uppercase font-bold text-[#c084fc] tracking-wider block">
+              CERTIFIED COMPLIANCE FRAMEWORKS
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                { title: 'SOC 2 Type II Certified', desc: 'Zero-knowledge vector partition, continuous automated audit ledger logging.', status: 'Active (2026 Audit)' },
+                { title: 'GDPR / CCPA Compliant', desc: 'Automated PII scrubbing, right-to-be-forgotten vector purging API.', status: 'Enforced' },
+                { title: 'ISO/IEC 27001 Certified', desc: 'Cryptographic HSM envelope encryption with automated KMS rotation.', status: 'Certified' },
+              ].map((c, i) => (
+                <div key={i} className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                  <div className="flex items-center gap-1.5 text-[#4ade80] font-display text-xs font-bold">
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>{c.title}</span>
                   </div>
-                  <ul className="space-y-2 text-xs text-[#737373] font-light">
-                    {sl.items.map((item, i) => (
-                      <li key={i} className="flex items-start gap-2">
-                        <span className="text-[#525252] mt-0.5">•</span>
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <p className="font-sans text-[11px] text-[#cbd5e1] leading-relaxed">
+                    {c.desc}
+                  </p>
+                  <span className="font-mono text-[9px] text-[#38bdf8] block pt-1">
+                    Status: {c.status}
+                  </span>
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
 
-          {/* Performance Benchmark Matrix */}
-          <div className="p-5 bg-[#121212] border border-[#262626] text-xs">
-            <div className="flex items-center justify-between text-[9px] uppercase tracking-[0.3em] text-[#737373] font-mono mb-4">
-              <span>Benchmark Metrics</span>
-              <span>Enterprise Scale</span>
-            </div>
-            <div className="grid grid-cols-3 gap-4 text-center pt-4 border-t border-[#262626]">
-              <div>
-                <div className="text-xl font-serif italic text-white">&lt; 180ms</div>
-                <div className="text-[9px] uppercase tracking-[0.2em] text-[#525252] mt-1 font-mono">P95 Search</div>
+          {/* Indexing & Vector DB Pipeline */}
+          <div className="space-y-2">
+            <span className="font-mono text-[10px] uppercase font-bold text-[#38bdf8] tracking-wider block">
+              VECTOR DB & RAG RETRIEVAL PIPELINE
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+                <div className="flex items-center gap-2 text-white font-display text-xs font-bold">
+                  <Database className="w-4 h-4 text-[#c084fc]" />
+                  <span>Embedding & Ingestion Specs</span>
+                </div>
+                <ul className="space-y-1.5 font-mono text-[11px] text-[#cbd5e1]">
+                  <li>• Embedding Model: <strong className="text-white">all-MiniLM-L6-v2 (384 dims)</strong></li>
+                  <li>• Chunking Strategy: <strong className="text-white">512 tokens (20% overlap)</strong></li>
+                  <li>• Vector Store: <strong className="text-white">ChromaDB / pgvector Single-Tenant</strong></li>
+                  <li>• Hashing: <strong className="text-white">SHA-256 Provenance Ledger</strong></li>
+                </ul>
               </div>
-              <div>
-                <div className="text-xl font-serif italic text-white">99.99%</div>
-                <div className="text-[9px] uppercase tracking-[0.2em] text-[#525252] mt-1 font-mono">SLA Uptime</div>
-              </div>
-              <div>
-                <div className="text-xl font-serif italic text-white">100M+</div>
-                <div className="text-[9px] uppercase tracking-[0.2em] text-[#525252] mt-1 font-mono">Vector Docs</div>
+
+              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+                <div className="flex items-center gap-2 text-white font-display text-xs font-bold">
+                  <Lock className="w-4 h-4 text-[#38bdf8]" />
+                  <span>PII Redaction & Security Enclave</span>
+                </div>
+                <ul className="space-y-1.5 font-mono text-[11px] text-[#cbd5e1]">
+                  <li>• PII Scrubbing: <strong className="text-white">Regex + NER Pre-Embedding Gate</strong></li>
+                  <li>• Token Redaction: <strong className="text-white">SSN, Credit Cards, API Keys</strong></li>
+                  <li>• Key Management: <strong className="text-white">Dedicated Sovereign KMS</strong></li>
+                  <li>• Transport Security: <strong className="text-white">mTLS 1.3 / End-to-End Encrypted</strong></li>
+                </ul>
               </div>
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="p-5 border-t border-[#262626] bg-[#121212] flex justify-end">
+        <div className="p-4 border-t border-white/10 bg-white/5 flex items-center justify-between">
+          <span className="font-mono text-[10px] text-[#94a3b8]">
+            Audited by Coalfire Labs // ISO 27001 Registered
+          </span>
           <button
-            onClick={onClose}
-            className="border border-[#404040] bg-transparent text-[#D4D4D4] hover:bg-white hover:text-black hover:border-white px-6 py-2.5 text-[10px] uppercase tracking-[0.2em] transition-all cursor-pointer"
+            onClick={() => {
+              playTactileClick();
+              onClose();
+            }}
+            className="btn-orbitsat-purple px-5 py-2 rounded-full font-sans text-xs font-bold uppercase tracking-wider cursor-pointer"
           >
-            Close Blueprint
+            Close Architecture
           </button>
         </div>
       </div>

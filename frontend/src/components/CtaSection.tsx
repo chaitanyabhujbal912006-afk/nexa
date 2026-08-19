@@ -1,69 +1,54 @@
 import React from 'react';
-import { ArrowRight, Check } from 'lucide-react';
+import { Apple, ArrowRight, ShieldCheck, Zap, Sparkles } from 'lucide-react';
+import { playTactileClick, playResolvedChime } from '../utils/audio';
 
 interface CtaSectionProps {
-  onGetStarted: () => void;
-  onExplore: () => void;
+  onEnterNexa: () => void;
 }
 
-export const CtaSection: React.FC<CtaSectionProps> = ({ onGetStarted, onExplore }) => {
+export const CtaSection: React.FC<CtaSectionProps> = ({ onEnterNexa }) => {
   return (
-    <section
-      id="enterprise"
-      className="w-full flex flex-col items-center justify-center text-center py-20 sm:py-28 relative bg-[#121212] border border-[#262626] shadow-2xl"
-    >
-      {/* Corner brackets */}
-      <div className="absolute -top-3 -left-3 w-8 h-8 border-t border-l border-[#404040]"></div>
-      <div className="absolute -bottom-3 -right-3 w-8 h-8 border-b border-r border-[#404040]"></div>
+    <section className="w-full py-20 px-4 flex justify-center relative z-10">
+      <div className="w-full max-w-4xl apple-glass-card rounded-[36px] p-8 sm:p-14 border border-white/15 shadow-2xl relative overflow-hidden text-center flex flex-col items-center gap-6">
+        {/* Glow backdrop */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#7c3aed]/25 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="z-10 flex flex-col items-center gap-8 px-6 max-w-3xl">
-        <span className="text-[#D4D4D4] text-[10px] uppercase tracking-[0.4em] font-medium font-sans">
-          Deployment Phase MMXXIV
-        </span>
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#7c3aed] to-[#38bdf8] p-0.5 flex items-center justify-center shadow-[0_0_25px_rgba(139,92,246,0.6)]">
+          <div className="w-full h-full bg-[#0d0a1c] rounded-[14px] flex items-center justify-center">
+            <Zap className="w-6 h-6 text-[#c084fc] fill-current" />
+          </div>
+        </div>
 
-        {/* Title */}
-        <h2 className="text-4xl sm:text-6xl lg:text-[72px] leading-[1.0] font-serif text-white tracking-tight">
-          Stop searching.
-          <br />
-          <span className="italic font-light text-[#D4D4D4]">Start knowing.</span>
+        <h2 className="font-display text-3xl sm:text-5xl font-extrabold text-white tracking-tight max-w-2xl">
+          Deploy NEXA enterprise intelligence today.
         </h2>
 
-        {/* Subtext */}
-        <p className="text-sm sm:text-base text-[#737373] max-w-xl font-light leading-relaxed">
-          Empower enterprise teams with cryptographic provenance, verified grounding, and instant temporal conflict resolution across millions of unindexed documents.
+        <p className="font-sans text-sm sm:text-base text-[#94a3b8] max-w-xl">
+          Unify your company's scattered knowledge, automate policy contradiction arbitration, and empower your teams with 100% verified cited truth.
         </p>
 
-        {/* Buttons in Gallery Style */}
-        <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 mt-4">
+        <div className="flex flex-col sm:flex-row items-center gap-4 mt-2">
           <button
-            id="cta-get-started-btn"
-            onClick={onGetStarted}
-            className="bg-white text-black border border-white hover:bg-[#E5E5E5] px-10 py-4 text-[10px] uppercase tracking-[0.2em] font-medium transition-all duration-300 flex items-center gap-3 cursor-pointer"
+            onClick={() => {
+              playResolvedChime();
+              onEnterNexa();
+            }}
+            className="btn-orbitsat-purple px-8 py-3.5 rounded-full font-sans text-sm font-bold flex items-center justify-center gap-2.5 cursor-pointer"
           >
-            <span>Get Started with Nexa</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-
-          <button
-            id="cta-explore-platform-btn"
-            onClick={onExplore}
-            className="border border-[#404040] bg-transparent text-[#D4D4D4] hover:bg-white hover:text-black hover:border-white px-10 py-4 text-[10px] uppercase tracking-[0.2em] font-light transition-all duration-300 cursor-pointer"
-          >
-            Explore the platform
+            <Sparkles className="w-4 h-4" />
+            <span>Launch Live Intelligence Vault</span>
+            <ArrowRight className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Guarantee row in minimal style */}
-        <div className="flex flex-wrap items-center justify-center gap-8 pt-6 border-t border-[#262626] text-[9px] uppercase tracking-[0.25em] text-[#525252] font-mono">
-          <span className="flex items-center gap-2">
-            <Check className="w-3 h-3 text-[#A3A3A3]" /> Enterprise SSO & SCIM
+        <div className="pt-6 border-t border-white/10 flex flex-wrap items-center justify-center gap-6 font-mono text-xs text-[#94a3b8]">
+          <span className="flex items-center gap-1.5 text-white">
+            <ShieldCheck className="w-4 h-4 text-[#c084fc]" /> Zero-Trust Encryption
           </span>
-          <span className="flex items-center gap-2">
-            <Check className="w-3 h-3 text-[#A3A3A3]" /> 14-Day Sandbox Trial
-          </span>
-          <span className="flex items-center gap-2">
-            <Check className="w-3 h-3 text-[#A3A3A3]" /> Solutions Architecture Onboarding
-          </span>
+          <span className="w-1 h-1 rounded-full bg-white/20" />
+          <span>Real-Time Policy Arbitration</span>
+          <span className="w-1 h-1 rounded-full bg-white/20" />
+          <span>Multi-Source Vector Connectors</span>
         </div>
       </div>
     </section>
