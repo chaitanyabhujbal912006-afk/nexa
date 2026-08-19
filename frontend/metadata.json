@@ -1,0 +1,6 @@
+{
+  "name": "NEXA Knowledge Intelligence Engine",
+  "description": "Enterprise AI knowledge intelligence platform with multi-source synthesis, real-time conflict detection, and traceable cited answers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
