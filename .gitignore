@@ -1,25 +1,8 @@
-# Streamlit secrets — NEVER commit API keys!
-.streamlit/secrets.toml
-**/secrets.toml
-
-# Local databases and vector stores
-chroma_db/
-**/chroma_db/
-*.sqlite3
-
-# Python bytecode and environment
-__pycache__/
-*.pyc
-*.pyo
-.env
-venv/
-.venv/
-
-# Audit logs & scratch data
-audit_log.jsonl
-**/audit_log.jsonl
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
 *.log
-*.cpp
-
-# Local AI agent config (not part of the project)
-.agents/
+.env*
+!.env.example

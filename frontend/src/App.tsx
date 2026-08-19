@@ -1,270 +1,220 @@
 import React, { useState, useEffect } from 'react';
-import { Header } from './components/Header';
+import { ScreenView, UserSession } from './types';
+import { HeaderNav } from './components/HeaderNav';
 import { HeroSection } from './components/HeroSection';
-import { SearchQuerySection } from './components/SearchQuerySection';
-import { FeaturesGrid } from './components/FeaturesGrid';
-import { KnowledgeChaosSection } from './components/KnowledgeChaosSection';
-import { ConflictDetectionSection } from './components/ConflictDetectionSection';
-import { CitationEvidenceSection } from './components/CitationEvidenceSection';
-import { ArchitectureSection } from './components/ArchitectureSection';
+import { NexaFeatureShowcase } from './components/NexaFeatureShowcase';
+import { NexaCoreCapabilities } from './components/NexaCoreCapabilities';
 import { CtaSection } from './components/CtaSection';
 import { Footer } from './components/Footer';
-import { DocumentModal } from './components/DocumentModal';
-import { GetStartedModal } from './components/GetStartedModal';
-import { ArchitectureModal } from './components/ArchitectureModal';
-import { NeuralQueryStudio } from './components/NeuralQueryStudio';
-import { ConflictMatrixView } from './components/ConflictMatrixView';
-import { ClusterTopologyView } from './components/ClusterTopologyView';
-import { SettingsCenter } from './components/SettingsCenter';
-import { BackendIntegrationView } from './components/BackendIntegrationView';
-import { SCENARIOS } from './data/mockKnowledge';
-import { AppView, CitationItem, ColorTheme, NexaSystemSettings, QueryScenario } from './types';
-import { playFuturisticSound } from './utils/audioFx';
+import { AuthSignIn } from './components/AuthSignIn';
+import { AuthSignUp } from './components/AuthSignUp';
+import { IntelligenceWorkspace } from './components/IntelligenceWorkspace';
+import { CommandPalette } from './components/CommandPalette';
+import { restoreSession, logout } from './api/auth';
+
+const EMPTY_SESSION: UserSession = {
+  fullName: '',
+  email: '',
+  role: '',
+  company: '',
+  isLoggedIn: false,
+};
 
 export default function App() {
-  // App Navigation View
-  const [currentView, setCurrentView] = useState<AppView>('landing');
+  const [currentView, setCurrentView] = useState<ScreenView>('landing');
+  const [activeSection, setActiveSection] = useState<string>('hero');
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [scrollY, setScrollY] = useState(0);
+  const [scrollProgress, setScrollProgress] = useState(0);
 
-  // Master System Settings
-  const [systemSettings, setSystemSettings] = useState<NexaSystemSettings>({
-    topK: 5,
-    minSimilarity: 0.75,
-    chunkOverlapPercent: 20,
-    rerankModel: 'nexa-cross-encoder-v2',
-    contextWindowTokens: 32000,
-    recencyWeight: 0.65,
-    authorityWeight: 0.35,
-    legalStatusBonus: 0.15,
-    autoResolveThreshold: 0.85,
-    strictnessMode: 'balanced',
-    hashAlgorithm: 'SHA-256',
-    enablePiiRedaction: true,
-    redactCreditCards: true,
-    redactSsn: true,
-    redactApiKeys: true,
-    tamperProofAuditLog: true,
-    colorTheme: 'cyber-neon',
-    scanlinesIntensity: 50,
-    holographicGlow: 70,
-    particlePhysicsCount: 60,
-    cyberGridEnabled: true,
-    motionReduced: false,
-    audioFxEnabled: true,
-    masterVolume: 0.4,
-    soundOnQuery: true,
-    soundOnConflict: true,
-    backendUrl: '',
-    useLiveBackend: false,
-    activeModel: 'gemini-2.0-flash',
-    apiKey: '',
-    streamingSpeedMs: 15,
-  });
+  const [session, setSession] = useState<UserSession>(EMPTY_SESSION);
 
-  // Query & Scenario state
-  const [activeQueryKey, setActiveQueryKey] = useState<string>('refund');
-  const [activeScenario, setActiveScenario] = useState<QueryScenario>(SCENARIOS.refund);
-  const [selectedDocName, setSelectedDocName] = useState<string | null>(null);
-  const [selectedCitation, setSelectedCitation] = useState<CitationItem | null>(null);
-  const [isGetStartedOpen, setIsGetStartedOpen] = useState(false);
-  const [getStartedMode, setGetStartedMode] = useState<'signup' | 'login' | 'demo'>('signup');
-  const [isArchitectureModalOpen, setIsArchitectureModalOpen] = useState(false);
-
-  // Sync data-theme attribute on document root
+  // Track scroll position for interactive scrolling parallax & progress bar
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', systemSettings.colorTheme);
-  }, [systemSettings.colorTheme]);
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      setScrollY(currentScrollY);
 
-  // Cycle color themes
-  const handleToggleTheme = () => {
-    const themeCycle: ColorTheme[] = ['cyber-neon', 'quantum-violet', 'solar-plasma', 'matrix-emerald'];
-    const currentIndex = themeCycle.indexOf(systemSettings.colorTheme);
-    const nextTheme = themeCycle[(currentIndex + 1) % themeCycle.length];
-    setSystemSettings((prev) => ({ ...prev, colorTheme: nextTheme }));
-  };
+      const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
+      if (totalHeight > 0) {
+        setScrollProgress(Math.min(100, (currentScrollY / totalHeight) * 100));
+      }
+    };
 
-  // Toggle audio sound effects
-  const handleToggleAudio = () => {
-    setSystemSettings((prev) => ({ ...prev, audioFxEnabled: !prev.audioFxEnabled }));
-  };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
-  // Handle queries in landing search bar
-  const handleRunQuery = (query: string) => {
-    const lower = query.toLowerCase();
-    playFuturisticSound('laser-ping', systemSettings.audioFxEnabled, systemSettings.masterVolume);
+  // Restore session from stored JWT on initial app load
+  useEffect(() => {
+    const stored = restoreSession();
+    if (stored) {
+      setSession({
+        userId: stored.userId,
+        email: stored.email,
+        fullName: stored.fullName || stored.email.split('@')[0],
+        role: stored.role || 'Member',
+        company: stored.company || '',
+        isLoggedIn: true,
+      });
+      setCurrentView('workspace');
+    }
+  }, []);
 
-    if (lower.includes('warranty') || lower.includes('sla') || lower.includes('hardware')) {
-      setActiveQueryKey('warranty');
-      setActiveScenario(SCENARIOS.warranty);
-    } else if (lower.includes('sabbatical') || lower.includes('leave') || lower.includes('tenure')) {
-      setActiveQueryKey('sabbatical');
-      setActiveScenario(SCENARIOS.sabbatical);
+  // Listen for forced logout (emitted by client.ts on 401 responses)
+  useEffect(() => {
+    const handleForcedLogout = () => {
+      setSession(EMPTY_SESSION);
+      setCurrentView('landing');
+    };
+    window.addEventListener('nexa:logout', handleForcedLogout);
+    return () => window.removeEventListener('nexa:logout', handleForcedLogout);
+  }, []);
+
+  const scrollToSection = (sectionId: string) => {
+    if (currentView !== 'landing') {
+      setCurrentView('landing');
+      setTimeout(() => {
+        const el = document.getElementById(sectionId);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 120);
     } else {
-      setActiveQueryKey('refund');
-      setActiveScenario(SCENARIOS.refund);
+      const el = document.getElementById(sectionId);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+      }
     }
-
-    const el = document.querySelector('#citation-evidence-section');
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
-    }
+    setActiveSection(sectionId);
   };
 
-  const handleOpenDocModal = (docName: string) => {
-    setSelectedDocName(docName);
-    setSelectedCitation(null);
-    playFuturisticSound('click', systemSettings.audioFxEnabled, systemSettings.masterVolume * 0.4);
+  const handleSignInSuccess = (userSession: UserSession) => {
+    setSession(userSession);
+    setCurrentView('workspace');
   };
 
-  const handleOpenCitationModal = (citation: CitationItem) => {
-    setSelectedCitation(citation);
-    setSelectedDocName(citation.docName);
-    playFuturisticSound('quantum-chime', systemSettings.audioFxEnabled, systemSettings.masterVolume * 0.4);
+  const handleSignUpSuccess = (userSession: UserSession) => {
+    setSession(userSession);
+    setCurrentView('workspace');
   };
 
-  const handleCloseDocModal = () => {
-    setSelectedDocName(null);
-    setSelectedCitation(null);
-  };
-
-  const handleOpenGetStarted = (mode: 'signup' | 'login' | 'demo' = 'signup') => {
-    setGetStartedMode(mode);
-    setIsGetStartedOpen(true);
-    playFuturisticSound('quantum-chime', systemSettings.audioFxEnabled, systemSettings.masterVolume);
+  const handleLogout = () => {
+    logout(); // Clears JWT + local profile from localStorage
+    setSession(EMPTY_SESSION);
+    setCurrentView('landing');
   };
 
   return (
-    <div className={`min-h-screen bg-[var(--theme-bg)] text-slate-100 flex flex-col relative selection:bg-[var(--theme-primary)] selection:text-slate-950 ${systemSettings.cyberGridEnabled ? 'cyber-grid-bg' : ''}`}>
-      {/* Background Animated Neon Glow Beams */}
-      <div className="fixed top-0 left-1/4 w-[650px] h-[650px] bg-[var(--theme-primary)]/10 rounded-full blur-[160px] pointer-events-none -z-10 animate-float-slow" />
-      <div className="fixed bottom-1/4 right-1/4 w-[600px] h-[600px] bg-[var(--theme-secondary)]/10 rounded-full blur-[150px] pointer-events-none -z-10 animate-float-delay" />
-
-      {/* Cyber Scanline Overlay */}
-      {systemSettings.scanlinesIntensity > 0 && (
+    <div className="min-h-screen bg-[#06040e] text-[#f8fafc] relative overflow-x-hidden font-sans selection:bg-[#8b5cf6]/40 selection:text-white">
+      {/* Top Interactive Scroll Progress Indicator */}
+      <div className="fixed top-0 left-0 right-0 h-[2.5px] z-50 bg-white/5">
         <div
-          className="fixed inset-0 cyber-scanlines pointer-events-none z-40"
-          style={{ opacity: systemSettings.scanlinesIntensity / 100 }}
+          className="h-full bg-gradient-to-r from-[#7c3aed] via-[#a855f7] to-[#38bdf8] transition-all duration-75 shadow-[0_0_12px_rgba(168,85,247,0.8)]"
+          style={{ width: `${scrollProgress}%` }}
         />
-      )}
+      </div>
 
-      {/* Futuristic Floating Header */}
-      <Header
-        currentView={currentView}
-        onNavigate={setCurrentView}
-        colorTheme={systemSettings.colorTheme}
-        onToggleTheme={handleToggleTheme}
-        audioFxEnabled={systemSettings.audioFxEnabled}
-        onToggleAudio={handleToggleAudio}
-        onOpenGetStarted={() => handleOpenGetStarted('signup')}
+      {/* Planetary Cosmic Horizon Background Glows */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        {/* Upper Violet Horizon Atmosphere Glow */}
+        <div
+          className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[90vw] max-w-[1400px] h-[550px] rounded-full bg-[#7c3aed]/20 blur-[140px] transition-transform duration-100 ease-out"
+          style={{ transform: `translateX(-50%) translateY(${scrollY * 0.1}px)` }}
+        />
+        {/* Subtle Side Ambient Nebulae */}
+        <div className="absolute top-[35%] right-[-10%] w-[45vw] h-[45vw] rounded-full bg-[#38bdf8]/10 blur-[130px]" />
+        <div className="absolute top-[65%] left-[-10%] w-[45vw] h-[45vw] rounded-full bg-[#9333ea]/15 blur-[140px]" />
+      </div>
+
+      {/* Global Command Palette (⌘K) */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onNavigate={(view) => setCurrentView(view)}
+        onScrollTo={scrollToSection}
+        onSelectQuery={() => scrollToSection('features-showcase')}
       />
 
-      {/* Dynamic Main View Switcher */}
-      <main className="flex-grow pt-24 sm:pt-28 pb-20 px-4 sm:px-6 md:px-10 max-w-[1440px] mx-auto w-full flex flex-col gap-16 sm:gap-24 relative z-10">
-        {/* VIEW 1: Landing Experience */}
-        {currentView === 'landing' && (
-          <>
+      {/* Screen Views */}
+      {currentView === 'login' ? (
+        <AuthSignIn
+          onSignInSuccess={handleSignInSuccess}
+          onSwitchToSignUp={() => setCurrentView('signup')}
+          onBackToLanding={() => setCurrentView('landing')}
+        />
+      ) : currentView === 'signup' ? (
+        <AuthSignUp
+          onSignUpSuccess={handleSignUpSuccess}
+          onSwitchToSignIn={() => setCurrentView('login')}
+          onBackToLanding={() => setCurrentView('landing')}
+        />
+      ) : currentView === 'workspace' ? (
+        <>
+          <HeaderNav
+            currentView={currentView}
+            onNavigate={setCurrentView}
+            session={session}
+            onLogout={handleLogout}
+            activeSection={activeSection}
+            onSectionClick={scrollToSection}
+            onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+          />
+          <IntelligenceWorkspace
+            session={session}
+            onBackToLanding={() => setCurrentView('landing')}
+            onUpdateSession={setSession}
+          />
+          <Footer />
+        </>
+      ) : (
+        /* Streamlined NEXA Intelligence Home Page */
+        <div className="relative z-10 flex flex-col min-h-screen">
+          <HeaderNav
+            currentView={currentView}
+            onNavigate={setCurrentView}
+            session={session}
+            onLogout={handleLogout}
+            activeSection={activeSection}
+            onSectionClick={scrollToSection}
+            onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+          />
+
+          <main className="flex flex-col gap-12 lg:gap-16 px-4 sm:px-8 max-w-[1440px] mx-auto w-full">
+            {/* 1. Luminous Planetary Horizon Hero Section */}
             <HeroSection
-              colorTheme={systemSettings.colorTheme}
-              onEnterNeuralStudio={() => {
-                setCurrentView('neural-studio');
-                playFuturisticSound('quantum-chime', systemSettings.audioFxEnabled, systemSettings.masterVolume);
+              scrollY={scrollY}
+              onEnterNexa={() => {
+                if (session.isLoggedIn) {
+                  setCurrentView('workspace');
+                } else {
+                  setCurrentView('signup');
+                }
               }}
-              onExploreGraph={() => {
-                const el = document.querySelector('#quantum-graph-section');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              onSelectDocument={handleOpenDocModal}
+              onSeeHowItWorks={() => scrollToSection('features-showcase')}
             />
 
-            <SearchQuerySection
-              onRunQuery={handleRunQuery}
-              activeQuery={activeScenario.shortQuery}
-            />
+            {/* 2. Interactive NEXA Feature Showcase */}
+            <NexaFeatureShowcase />
 
-            <FeaturesGrid />
+            {/* 3. High-Precision Enterprise Architecture (3 Cards) */}
+            <NexaCoreCapabilities />
 
-            <KnowledgeChaosSection onSelectDoc={handleOpenDocModal} />
-
-            <ConflictDetectionSection onInspectDoc={handleOpenDocModal} />
-
-            <CitationEvidenceSection
-              scenario={activeScenario}
-              onOpenCitationModal={handleOpenCitationModal}
-            />
-
-            <ArchitectureSection
-              onOpenArchitectureDetails={() => setIsArchitectureModalOpen(true)}
-            />
-
+            {/* 4. Streamlined Cosmic Call to Action */}
             <CtaSection
-              onGetStarted={() => handleOpenGetStarted('signup')}
-              onExplore={() => {
-                setCurrentView('neural-studio');
-                playFuturisticSound('quantum-chime', systemSettings.audioFxEnabled, systemSettings.masterVolume);
+              onEnterNexa={() => {
+                if (session.isLoggedIn) {
+                  setCurrentView('workspace');
+                } else {
+                  setCurrentView('signup');
+                }
               }}
             />
-          </>
-        )}
+          </main>
 
-        {/* VIEW 2: Live Neural Studio */}
-        {currentView === 'neural-studio' && (
-          <NeuralQueryStudio
-            settings={systemSettings}
-            onOpenCitationModal={handleOpenCitationModal}
-          />
-        )}
-
-        {/* VIEW 3: Conflict Matrix Studio */}
-        {currentView === 'conflict-matrix' && (
-          <ConflictMatrixView
-            settings={systemSettings}
-            onInspectDoc={handleOpenDocModal}
-          />
-        )}
-
-        {/* VIEW 4: Cluster Topology & Telemetry */}
-        {currentView === 'cluster-topology' && (
-          <ClusterTopologyView settings={systemSettings} />
-        )}
-
-        {/* VIEW 5: In-App Backend Hub */}
-        {currentView === 'backend-docs' && (
-          <BackendIntegrationView settings={systemSettings} />
-        )}
-
-        {/* VIEW 6: Hyper-Granular Settings Hub */}
-        {currentView === 'settings-hub' && (
-          <SettingsCenter
-            settings={systemSettings}
-            onUpdateSettings={setSystemSettings}
-          />
-        )}
-      </main>
-
-      {/* Footer */}
-      <Footer
-        onOpenPrivacy={() => handleOpenGetStarted('demo')}
-        onOpenTerms={() => handleOpenGetStarted('demo')}
-        onOpenSecurity={() => setIsArchitectureModalOpen(true)}
-        onOpenApi={() => setCurrentView('backend-docs')}
-      />
-
-      {/* Interactive Modals */}
-      <DocumentModal
-        documentName={selectedDocName}
-        citationItem={selectedCitation}
-        onClose={handleCloseDocModal}
-      />
-
-      <GetStartedModal
-        isOpen={isGetStartedOpen}
-        initialMode={getStartedMode}
-        onClose={() => setIsGetStartedOpen(false)}
-      />
-
-      <ArchitectureModal
-        isOpen={isArchitectureModalOpen}
-        onClose={() => setIsArchitectureModalOpen(false)}
-      />
+          <Footer />
+        </div>
+      )}
     </div>
   );
 }

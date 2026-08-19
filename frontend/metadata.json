@@ -1,6 +1,6 @@
 {
-  "name": "NEXA Knowledge Intelligence Engine",
-  "description": "Enterprise AI knowledge intelligence platform with multi-source synthesis, real-time conflict detection, and traceable cited answers.",
+  "name": "NEXA - Enterprise Knowledge Intelligence",
+  "description": "Enterprise knowledge intelligence platform featuring multi-source vector ingestion, automated contradiction arbitration, and cryptographically cited truth.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
