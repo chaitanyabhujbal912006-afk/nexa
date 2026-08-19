@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: nexa-api
+    env: python
+    rootDir: kb-agent
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: NEXA_ALLOWED_ORIGINS
+        value: https://nexa-frontend.vercel.app,http://localhost:3000
