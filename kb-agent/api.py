@@ -45,7 +45,7 @@ from rag_engine import (
     scan_all_conflicts,
 )
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, UploadFile, File, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, UploadFile, File, Response, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 
@@ -452,9 +452,24 @@ def query_knowledge_base(req: QueryRequest, request: Request, user: Dict[str, An
         raise _problem(500, "QUERY_FAILED", "Internal server error during query processing.")
 
 
+def _run_ingestion_background(user_id: str):
+    logger.info("Starting background ingestion for user %s...", user_id)
+    with _ingest_lock:
+        try:
+            ingest_module.main(user_id=user_id)
+            logger.info("Completed background ingestion for user %s.", user_id)
+        except Exception as exc:
+            logger.exception("Background ingestion failed for user %s: %s", user_id, exc)
+
+
 @app.post("/api/v1/upload", tags=["Knowledge"])
 @rate_limit(_RATE_LIMIT_INGEST)
-def upload_document(request: Request, file: UploadFile = File(...), user: Dict[str, Any] = Depends(get_current_user)):
+def upload_document(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    user: Dict[str, Any] = Depends(get_current_user)
+):
     ALLOWED_EXTENSIONS = {"pdf", "xlsx", "xls", "csv", "txt", "eml"}
     fname = os.path.basename(file.filename or "upload")
     ext = fname.rsplit(".", 1)[-1].lower() if "." in fname else ""
@@ -491,30 +506,13 @@ def upload_document(request: Request, file: UploadFile = File(...), user: Dict[s
     finally:
         file.file.close()
 
-    if not _ingest_lock.acquire(blocking=False):
-        return {
-            "status": "uploaded",
-            "file": fname,
-            "bytes": len(content),
-            "ingestion": "queued",
-        }
-    try:
-        summary = ingest_module.main(user_id=user["user_id"])
-        return {
-            "status": "uploaded_and_ingested",
-            "file": fname,
-            "bytes": len(content),
-            "ingestion_summary": summary,
-        }
-    except Exception as exc:
-        return {
-            "status": "uploaded",
-            "file": fname,
-            "bytes": len(content),
-            "ingestion": f"re-ingestion failed: {exc}",
-        }
-    finally:
-        _ingest_lock.release()
+    background_tasks.add_task(_run_ingestion_background, user["user_id"])
+    return {
+        "status": "uploaded",
+        "file": fname,
+        "bytes": len(content),
+        "ingestion": "processing",
+    }
 
 
 @app.get("/api/v1/documents", tags=["Knowledge"])

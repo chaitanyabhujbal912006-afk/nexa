@@ -184,6 +184,8 @@ class TestUpload:
             assert res.status_code == 200
             data = res.json()
             assert data["file"] == "test_doc.pdf"
+            assert data["status"] == "uploaded"
+            assert data["ingestion"] == "processing"
         finally:
             import os
             filepath = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "pdf_src", "test_doc.pdf")
