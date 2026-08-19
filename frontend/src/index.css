@@ -1,0 +1,255 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --neon-cyan: #00f0ff;
+    --neon-blue: #0070f3;
+    --neon-purple: #9d00ff;
+    --neon-magenta: #ff007f;
+    --neon-emerald: #00ff88;
+    --neon-amber: #ffaa00;
+    
+    /* Active theme variables (Default: Cyber Neon) */
+    --theme-primary: #00f0ff;
+    --theme-secondary: #9d00ff;
+    --theme-accent: #ff007f;
+    --theme-glow: rgba(0, 240, 255, 0.4);
+    --theme-bg: #030712;
+    --theme-surface: rgba(10, 17, 34, 0.85);
+    --theme-border: rgba(0, 240, 255, 0.25);
+  }
+
+  /* Color Theme Variations */
+  [data-theme="cyber-neon"] {
+    --theme-primary: #00f0ff;
+    --theme-secondary: #9d00ff;
+    --theme-accent: #ff007f;
+    --theme-glow: rgba(0, 240, 255, 0.4);
+    --theme-bg: #030712;
+    --theme-surface: rgba(9, 17, 37, 0.88);
+    --theme-border: rgba(0, 240, 255, 0.28);
+  }
+
+  [data-theme="quantum-violet"] {
+    --theme-primary: #c084fc;
+    --theme-secondary: #818cf8;
+    --theme-accent: #38bdf8;
+    --theme-glow: rgba(192, 132, 252, 0.4);
+    --theme-bg: #090514;
+    --theme-surface: rgba(22, 12, 42, 0.88);
+    --theme-border: rgba(192, 132, 252, 0.3);
+  }
+
+  [data-theme="solar-plasma"] {
+    --theme-primary: #f59e0b;
+    --theme-secondary: #ef4444;
+    --theme-accent: #ec4899;
+    --theme-glow: rgba(245, 158, 11, 0.4);
+    --theme-bg: #100803;
+    --theme-surface: rgba(35, 16, 8, 0.88);
+    --theme-border: rgba(245, 158, 11, 0.3);
+  }
+
+  [data-theme="matrix-emerald"] {
+    --theme-primary: #10b981;
+    --theme-secondary: #06b6d4;
+    --theme-accent: #84cc16;
+    --theme-glow: rgba(16, 185, 129, 0.4);
+    --theme-bg: #02120b;
+    --theme-surface: rgba(6, 31, 20, 0.88);
+    --theme-border: rgba(16, 185, 129, 0.3);
+  }
+
+  body {
+    background-color: var(--theme-bg);
+    color: #e2e8f0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    overflow-x: hidden;
+  }
+}
+
+/* Futuristic Holographic Glass Cards */
+.cyber-card {
+  background: var(--theme-surface);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--theme-border);
+  box-shadow: 0 0 25px -5px var(--theme-glow);
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cyber-card:hover {
+  border-color: var(--theme-primary);
+  box-shadow: 0 0 35px 2px var(--theme-glow);
+}
+
+.cyber-card-subtle {
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Neon Gradient Text */
+.cyber-gradient-text {
+  background: linear-gradient(135deg, var(--theme-primary) 0%, var(--theme-secondary) 50%, var(--theme-accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 18px var(--theme-glow));
+}
+
+/* Neon Buttons */
+.btn-cyber-primary {
+  background: linear-gradient(135deg, var(--theme-primary) 0%, var(--theme-secondary) 100%);
+  color: #030712;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-size: 11px;
+  box-shadow: 0 0 25px var(--theme-glow);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  transition: all 0.3s ease;
+}
+
+.btn-cyber-primary:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 0 40px var(--theme-primary);
+  color: #000000;
+}
+
+.btn-cyber-ghost {
+  background: rgba(0, 240, 255, 0.05);
+  color: var(--theme-primary);
+  border: 1px solid var(--theme-border);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-size: 11px;
+  transition: all 0.3s ease;
+}
+
+.btn-cyber-ghost:hover {
+  background: var(--theme-primary);
+  color: #030712;
+  border-color: var(--theme-primary);
+  box-shadow: 0 0 25px var(--theme-glow);
+}
+
+/* Futuristic Scanline Effect */
+.cyber-scanlines {
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%, 
+    rgba(0, 0, 0, 0.25) 50%
+  ), linear-gradient(
+    90deg,
+    rgba(255, 0, 0, 0.03),
+    rgba(0, 255, 0, 0.01),
+    rgba(0, 0, 255, 0.03)
+  );
+  background-size: 100% 3px, 6px 100%;
+  pointer-events: none;
+}
+
+/* Futuristic Grid Background */
+.cyber-grid-bg {
+  background-image: 
+    linear-gradient(to right, rgba(0, 240, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 240, 255, 0.06) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Corner Tech Accents */
+.tech-corners {
+  position: relative;
+}
+
+.tech-corners::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  width: 8px;
+  height: 8px;
+  border-top: 2px solid var(--theme-primary);
+  border-left: 2px solid var(--theme-primary);
+  pointer-events: none;
+}
+
+.tech-corners::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-bottom: 2px solid var(--theme-primary);
+  border-right: 2px solid var(--theme-primary);
+  pointer-events: none;
+}
+
+/* Glowing Pulse Keyframe */
+@keyframes neonPulse {
+  0%, 100% {
+    box-shadow: 0 0 15px var(--theme-glow), inset 0 0 15px var(--theme-glow);
+    border-color: var(--theme-primary);
+  }
+  50% {
+    box-shadow: 0 0 30px var(--theme-primary), inset 0 0 20px var(--theme-primary);
+    border-color: #ffffff;
+  }
+}
+
+.animate-neon-pulse {
+  animation: neonPulse 3s infinite ease-in-out;
+}
+
+@keyframes radarSweep {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.radar-spinner {
+  animation: radarSweep 8s linear infinite;
+}
+
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-float-slow {
+  animation: floatSlow 5s ease-in-out infinite;
+}
+
+.animate-float-delay {
+  animation: floatSlow 6s ease-in-out infinite;
+  animation-delay: 2s;
+}
+
+/* Cyber Minimal Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #030712;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--theme-border);
+  border-radius: 3px;
+  box-shadow: 0 0 10px var(--theme-glow);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--theme-primary);
+}
