@@ -1,5 +1,11 @@
 {
-  "dependencies": {
-    "lutra": "^0.1.78"
+  "name": "nexa",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Nexa — Enterprise Knowledge Intelligence Engine",
+  "scripts": {
+    "dev": "npm run dev --prefix frontend",
+    "build": "npm run build --prefix frontend",
+    "test:backend": "pytest kb-agent/tests"
   }
 }
