@@ -76,6 +76,12 @@ _RATE_LIMIT_INGEST = os.environ.get("RATE_LIMIT_INGEST", "10/minute")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
+
+def _get_user_data_dir(user_id: str) -> str:
+    if user_id == "usr_default":
+        return DATA_DIR
+    return os.path.join(DATA_DIR, user_id)
+
 # ── In-Memory OTP Store (Production uses Supabase/Redis) ────────────────────
 _otp_store: Dict[str, str] = {}
 _ingest_lock = threading.Lock()
@@ -459,12 +465,13 @@ def upload_document(request: Request, file: UploadFile = File(...), user: Dict[s
             f"Unsupported file type '.{ext}'. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}.",
         )
 
+    user_dir = _get_user_data_dir(user["user_id"])
     if ext == "pdf":
-        target_dir = os.path.join(DATA_DIR, "pdf_src")
+        target_dir = os.path.join(user_dir, "pdf_src")
     elif ext in ("txt", "eml"):
-        target_dir = os.path.join(DATA_DIR, "emails")
+        target_dir = os.path.join(user_dir, "emails")
     else:
-        target_dir = DATA_DIR
+        target_dir = user_dir
 
     os.makedirs(target_dir, exist_ok=True)
     save_path = os.path.join(target_dir, fname)
@@ -492,7 +499,7 @@ def upload_document(request: Request, file: UploadFile = File(...), user: Dict[s
             "ingestion": "queued",
         }
     try:
-        summary = ingest_module.main()
+        summary = ingest_module.main(user_id=user["user_id"])
         return {
             "status": "uploaded_and_ingested",
             "file": fname,
@@ -513,11 +520,12 @@ def upload_document(request: Request, file: UploadFile = File(...), user: Dict[s
 @app.get("/api/v1/documents", tags=["Knowledge"])
 def list_documents(user: Dict[str, Any] = Depends(get_current_user)):
     docs = []
+    user_dir = _get_user_data_dir(user["user_id"])
     scan_map = [
-        (os.path.join(DATA_DIR, "pdf_src", "*.pdf"), "pdf"),
-        (os.path.join(DATA_DIR, "*.xlsx"), "excel"),
-        (os.path.join(DATA_DIR, "*.csv"), "csv"),
-        (os.path.join(DATA_DIR, "emails", "*.*"), "email"),
+        (os.path.join(user_dir, "pdf_src", "*.pdf"), "pdf"),
+        (os.path.join(user_dir, "*.xlsx"), "excel"),
+        (os.path.join(user_dir, "*.csv"), "csv"),
+        (os.path.join(user_dir, "emails", "*.*"), "email"),
     ]
     for pattern, doc_type in scan_map:
         for path in sorted(glob.glob(pattern)):
@@ -539,10 +547,11 @@ def delete_document(doc_name: str, user: Dict[str, Any] = Depends(get_current_us
     if not safe_name or safe_name != doc_name:
         raise _problem(400, "INVALID_DOC_NAME", "Document name contains invalid path characters.")
 
+    user_dir = _get_user_data_dir(user["user_id"])
     candidate_dirs = [
-        os.path.join(DATA_DIR, "pdf_src"),
-        DATA_DIR,
-        os.path.join(DATA_DIR, "emails"),
+        os.path.join(user_dir, "pdf_src"),
+        user_dir,
+        os.path.join(user_dir, "emails"),
     ]
     file_path = next(
         (os.path.join(d, safe_name) for d in candidate_dirs if os.path.isfile(os.path.join(d, safe_name))),

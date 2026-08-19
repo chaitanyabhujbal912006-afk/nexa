@@ -196,10 +196,12 @@ def sanitize_topic(text):
     return clean[:40] if clean else "general"
 
 
-def ingest_emails():
+def ingest_emails(user_dir=None, user_id="usr_default"):
     """Each email is prose -> chunked, date pulled from headers/body/filename."""
+    if user_dir is None:
+        user_dir = DATA_DIR
     docs, metas, ids = [], [], []
-    for path in glob.glob(os.path.join(DATA_DIR, "emails", "*.txt")):
+    for path in glob.glob(os.path.join(user_dir, "emails", "*.txt")):
         content = read_file_text_safe(path)
 
         fname = os.path.basename(path)
@@ -218,15 +220,18 @@ def ingest_emails():
                 "doc_date": doc_date,
                 "section": f"chunk {idx + 1}",
                 "topic": topic,
+                "user_id": user_id,
             })
             ids.append(f"email-{fname}-{idx}")
     return docs, metas, ids
 
 
-def ingest_eml():
+def ingest_eml(user_dir=None, user_id="usr_default"):
     """Each .eml file parsed using Python email module -> extract plain text body & headers."""
+    if user_dir is None:
+        user_dir = DATA_DIR
     docs, metas, ids = [], [], []
-    for path in glob.glob(os.path.join(DATA_DIR, "emails", "*.eml")):
+    for path in glob.glob(os.path.join(user_dir, "emails", "*.eml")):
         with open(path, "rb") as f:
             msg = email.message_from_binary_file(f)
 
@@ -258,15 +263,18 @@ def ingest_eml():
                 "doc_date": doc_date,
                 "section": f"eml chunk {idx + 1}",
                 "topic": topic,
+                "user_id": user_id,
             })
             ids.append(f"eml-{fname}-{idx}")
     return docs, metas, ids
 
 
-def ingest_pdfs():
+def ingest_pdfs(user_dir=None, user_id="usr_default"):
     """Each PDF page -> chunked. Date pulled from metadata/header/body/filename."""
+    if user_dir is None:
+        user_dir = DATA_DIR
     docs, metas, ids = [], [], []
-    for path in glob.glob(os.path.join(DATA_DIR, "pdf_src", "*.pdf")):
+    for path in glob.glob(os.path.join(user_dir, "pdf_src", "*.pdf")):
         fname = os.path.basename(path)
         try:
             reader = PdfReader(path)
@@ -312,6 +320,7 @@ def ingest_pdfs():
                         "doc_date": doc_date,
                         "section": section_title,
                         "topic": topic,
+                        "user_id": user_id,
                     })
                     ids.append(f"pdf-{fname}-{idx}-{c_idx}")
         except Exception as err:
@@ -319,10 +328,12 @@ def ingest_pdfs():
     return docs, metas, ids
 
 
-def ingest_excel():
+def ingest_excel(user_dir=None, user_id="usr_default"):
     """Each row across ALL sheets in an Excel workbook -> turned into a natural-language sentence."""
+    if user_dir is None:
+        user_dir = DATA_DIR
     docs, metas, ids = [], [], []
-    for path in glob.glob(os.path.join(DATA_DIR, "*.xlsx")):
+    for path in glob.glob(os.path.join(user_dir, "*.xlsx")) + glob.glob(os.path.join(user_dir, "excel", "*.xlsx")):
         fname = os.path.basename(path)
         try:
             excel_file = pd.ExcelFile(path)
@@ -358,6 +369,7 @@ def ingest_excel():
                         "section": f"Sheet '{sheet_name}' row {row_idx + 2}",
                         "topic": topic,
                         "client": client_val,
+                        "user_id": user_id,
                     })
                     safe_sheet = re.sub(r"[^a-zA-Z0-9_-]", "_", str(sheet_name))
                     ids.append(f"xlsx-{fname}-{safe_sheet}-{row_idx}")
@@ -366,10 +378,12 @@ def ingest_excel():
     return docs, metas, ids
 
 
-def ingest_csv():
+def ingest_csv(user_dir=None, user_id="usr_default"):
     """Each row in a CSV file -> turned into natural-language sentence record."""
+    if user_dir is None:
+        user_dir = DATA_DIR
     docs, metas, ids = [], [], []
-    csv_paths = glob.glob(os.path.join(DATA_DIR, "*.csv")) + glob.glob(os.path.join(DATA_DIR, "csv", "*.csv"))
+    csv_paths = glob.glob(os.path.join(user_dir, "*.csv")) + glob.glob(os.path.join(user_dir, "csv", "*.csv"))
     for path in csv_paths:
         fname = os.path.basename(path)
         try:
@@ -410,6 +424,7 @@ def ingest_csv():
                     "section": f"Row {row_idx + 2}",
                     "topic": topic,
                     "client": client_val,
+                    "user_id": user_id,
                 })
                 ids.append(f"csv-{fname}-{row_idx}")
         except Exception as err:
@@ -417,32 +432,47 @@ def ingest_csv():
     return docs, metas, ids
 
 
-def main():
+def main(user_id: str = "usr_default"):
     print(f"Loading embedding model '{EMBED_MODEL}'...")
     model = SentenceTransformer(EMBED_MODEL)
 
     client = chromadb.PersistentClient(path=DB_DIR)
-    try:
-        client.delete_collection("sme_knowledge_base")
-    except Exception:
-        pass
-    collection = client.create_collection(
+    collection = client.get_or_create_collection(
         name="sme_knowledge_base",
         metadata={"hnsw:space": "cosine"},
     )
 
+    if user_id == "usr_default":
+        user_dir = DATA_DIR
+    else:
+        user_dir = os.path.join(DATA_DIR, user_id)
+        os.makedirs(user_dir, exist_ok=True)
+
     all_docs, all_metas, all_ids = [], [], []
     for fn in (ingest_emails, ingest_eml, ingest_pdfs, ingest_excel, ingest_csv):
-        d, m, i = fn()
+        d, m, i = fn(user_dir, user_id)
         all_docs += d
         all_metas += m
         all_ids += i
 
+    if not all_docs:
+        print(f"No documents found to ingest for user {user_id}.")
+        # Purge any existing chunks for this user if they deleted all files
+        existing = collection.get(where={"user_id": user_id})["ids"]
+        if existing:
+            collection.delete(ids=existing)
+        return {
+            "status": "success",
+            "total_chunks": 0,
+            "breakdown": {"email": 0, "pdf": 0, "excel": 0, "csv": 0},
+            "source_files": []
+        }
+
     print(f"Encoding {len(all_docs)} chunks with sentence-transformers...")
     embeddings = model.encode(all_docs, show_progress_bar=True).tolist()
 
-    # Clear + reload for idempotent re-runs during development
-    existing = collection.get()["ids"]
+    # Clear existing chunks for this user for idempotent re-runs
+    existing = collection.get(where={"user_id": user_id})["ids"]
     if existing:
         collection.delete(ids=existing)
 
@@ -457,7 +487,7 @@ def main():
         },
         "source_files": sorted(list({m["source_name"] for m in all_metas}))
     }
-    print(f"\nIngested {len(all_docs)} chunks from {len(summary['source_files'])} distinct files.")
+    print(f"\nIngested {len(all_docs)} chunks from {len(summary['source_files'])} distinct files for user {user_id}.")
     return summary
 
 
