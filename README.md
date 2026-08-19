@@ -10,7 +10,7 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.111+-009688?style=for-the-badge&logo=fastapi)
 ![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector%20Search-ff6600?style=for-the-badge)
 ![LLM](https://img.shields.io/badge/LLM-Gemini%202.0%20%7C%20Groq-ec4899?style=for-the-badge)
-![Tests](https://img.shields.io/badge/Tests-53%20Passed-34d399?style=for-the-badge)
+![Tests](https://img.shields.io/badge/Tests-49%20Passed-34d399?style=for-the-badge)
 
 ---
 
@@ -41,13 +41,14 @@ Citations & Provenance:
 | Feature | Description |
 |---|---|
 | 📂 **Multi-Format Ingestion** | Native parsing for PDF (+ OCR fallback), multi-sheet `.xlsx`, `.csv`, `.txt`, and `.eml` emails with safe encoding fallbacks. |
+| 🛡️ **Multi-Tenant User Isolation** | Per-user document subfolder partitioning (`data/<user_id>/...`) and vector database `user_id` metadata filtering for complete data privacy. |
+| ⚡ **Asynchronous Background Processing** | Non-blocking file upload ingestion powered by FastAPI `BackgroundTasks` with thread-safe vector database lock serialization. |
 | ⚖️ **Temporal Conflict Arbitration** | Proactively flags contradictions between legacy documents and active MSA terms using date normalization across 15+ formats. |
 | 🛡️ **Traceable Evidence & Hashes** | Every answer includes page/section citations, match confidence scores, and SHA-256 provenance cryptographic hashes. |
-| 🔒 **PII Redaction Engine** | Built-in automatic redaction for credit card numbers, SSNs, and API keys before LLM context dispatch. |
-| ⚡ **Dual LLM Synthesis** | High-performance dispatch prioritizing **Gemini 2.0 Flash** with automatic fallback to **Groq Llama-3.3-70B**. |
+| 📄 **Executive PDF Studio** | Generates downloadable executive summary PDF reports with clean Unicode character sanitization for quotes and symbols. |
 | 🎨 **Obsidian Kinetic UI** | High-contrast dark theme (*Palantir × Linear × Vercel*) with WebGL particle shaders, audio FX, and 4 theme modes. |
 | 📊 **Audit & Compliance Ledger** | Persistent JSONL audit logging tracking query latency, call IDs, LLM provider dispatch, and user context. |
-| 🧪 **Tested & CI/CD Ready** | 53 unit & integration tests passing with GitHub Actions CI automation. |
+| 🧪 **Tested & CI/CD Ready** | Fast, mocked Pytest suite (49 tests passing in ~1.7s) with GitHub Actions CI automation. |
 
 ---
 
@@ -55,33 +56,33 @@ Citations & Provenance:
 
 ```text
 [ Document Sources ]
- ├── data/pdf_src/*.pdf
- ├── data/*.xlsx, *.csv
- └── data/emails/*.eml
+ ├── data/<user_id>/pdf_src/*.pdf
+ ├── data/<user_id>/*.xlsx, *.csv
+ └── data/<user_id>/emails/*.eml
         │
         ▼
    [ ingest.py ] ──► SentenceTransformers (all-MiniLM-L6-v2) ──► [ ChromaDB Vector Store ]
-                                                                       │
+                                                                        │ (user_id filtered)
 [ Client Request ]                                                     │
  ├── Frontend (Vite/Next.js) ──► POST /api/v1/query                    │
  └── Streamlit Copilot UI    ──► rag_engine.retrieve() ───────────────┤
-                                      │                                │
-                                      ▼                                ▼
-                          [ detect_conflicts() ] ◄── Context Retrieval (top-K)
-                                      │
-                                      ▼
-                           [ generate_answer() ]
-                                      │
-                        ┌─────────────┴─────────────┐
-                        ▼                           ▼
-                 Gemini 2.0 Flash          Groq Llama-3.3-70B
-                        │                           │
-                        └─────────────┬─────────────┘
-                                      ▼
-                       [ Verified Answer + Citations ]
-                                      │
-                                      ▼
-                        [ JSONL Audit Ledger Logger ]
+                                       │                                │
+                                       ▼                                ▼
+                           [ detect_conflicts() ] ◄── Context Retrieval (top-K)
+                                       │
+                                       ▼
+                            [ generate_answer() ]
+                                       │
+                         ┌─────────────┴─────────────┐
+                         ▼                           ▼
+                  Gemini 2.0 Flash          Groq Llama-3.3-70B
+                         │                           │
+                         └─────────────┬─────────────┘
+                                       ▼
+                        [ Verified Answer + Citations ]
+                                       │
+                                       ▼
+                         [ JSONL Audit Ledger Logger ]
 ```
 
 ---
@@ -101,17 +102,19 @@ nexa/
 │   └── package.json
 │
 ├── kb-agent/                         # Production Python RAG Engine & FastAPI REST Server
-│   ├── api.py                        # FastAPI v3.0 REST Backend (/api/v1/query, /api/v1/health)
+│   ├── api.py                        # FastAPI v3.0 REST Backend (/api/v1/query, /api/v1/upload, /api/v1/health)
 │   ├── app.py                        # Streamlit Copilot & CRM Ticket Studio UI
-│   ├── rag_engine.py                 # Retrieval, conflict detection, LLM dispatch
-│   ├── ingest.py                     # Multi-source document ingestion pipeline
+│   ├── rag_engine.py                 # Retrieval, conflict detection, LLM dispatch & PDF generator
+│   ├── ingest.py                     # Multi-tenant document ingestion pipeline
 │   ├── audit.py                      # JSONL persistent audit logger
 │   ├── llm_config.py                 # Gemini / Groq API dispatcher
 │   ├── generate_sample_pdfs.py       # Sample PDF generator for testing
 │   ├── requirements.txt
-│   └── tests/                        # Pytest suite (53 passed)
+│   └── tests/                        # Pytest suite (49 passed in <2s)
+│       ├── conftest.py               # Global sentence-transformers mock
+│       └── test_api_backend.py       # Fully mocked FastAPI endpoint tests
 │
-├── stitch_nexa_knowledge_engine/     # Stitch design specs, code templates & screenshots
+├── .github/workflows/ci.yml          # GitHub Actions CI pipeline
 ├── docker-compose.yml                # One-command containerized deployment
 └── README.md
 ```
@@ -235,11 +238,24 @@ Executes an intelligent query with multi-source retrieval, temporal conflict det
 }
 ```
 
+### `POST /api/v1/upload`
+Uploads a document and queues asynchronous background vector ingestion.
+
+```json
+// Response (200 OK)
+{
+  "status": "uploaded",
+  "file": "vendor_contract_2026.pdf",
+  "bytes": 204850,
+  "ingestion": "processing"
+}
+```
+
 ---
 
 ## 🧪 Testing & CI/CD Pipeline
 
-Run the backend test suite:
+Run the optimized backend test suite:
 
 ```bash
 cd kb-agent
@@ -247,13 +263,12 @@ pytest -v
 ```
 
 ```text
-tests/test_api.py ......                                                 [ 11%]
-tests/test_api_backend.py .............                                  [ 35%]
-tests/test_ingest_dates.py .....                                         [ 45%]
-tests/test_rag_engine.py .....                                           [ 54%]
+tests/test_api_backend.py ...............                                [ 30%]
+tests/test_ingest_dates.py .....                                         [ 40%]
+tests/test_rag_engine.py .....                                           [ 51%]
 tests/test_real_world_cases.py ........................                  [100%]
 
-================= 53 passed, 3 warnings in 38.67s =================
+======================== 49 passed, 1 warning in 1.69s ========================
 ```
 
 GitHub Actions CI automatically executes the test suite on every `git push` to `main`.
