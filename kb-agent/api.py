@@ -124,12 +124,8 @@ _ingest_lock = threading.Lock()
 # ─────────────────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("⚡ Nexa API v3.0 starting — pre-warming embedding model...")
-    try:
-        get_model()
-        logger.info("✓ Embedding model ready | provider=%s", get_active_provider())
-    except Exception as exc:
-        logger.warning("Embedding model pre-warm failed: %s", exc)
+    logger.info("⚡ Nexa API v3.0 starting — initializing background model warmup...")
+    threading.Thread(target=get_model, daemon=True).start()
     yield
     logger.info("⚡ Nexa API shutting down.")
 
