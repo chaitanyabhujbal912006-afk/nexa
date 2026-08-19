@@ -11,3 +11,7 @@ __pycache__/
 
 # Audit logs
 audit_log.jsonl
+
+# Runtime secrets and persistent data stores
+data/.jwt_secret
+data/otp_store.json

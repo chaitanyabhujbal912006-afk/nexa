@@ -21,8 +21,10 @@ Run:
 from __future__ import annotations
 
 import glob
+import json
 import logging
 import os
+import secrets
 import sys
 import threading
 import time
@@ -58,10 +60,26 @@ logging.basicConfig(
 )
 logger = logging.getLogger("nexa.api")
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+
 # ── Environment & Secrets ────────────────────────────────────────────────────
 load_secrets()
 _NEXA_API_KEY = os.environ.get("NEXA_API_KEY", "")
-JWT_SECRET = os.environ.get("JWT_SECRET", "nexa-cyber-secret-key-2026-v3-enterprise-sovereign-production-key")
+
+if "JWT_SECRET" in os.environ:
+    JWT_SECRET = os.environ["JWT_SECRET"]
+else:
+    secret_file = os.path.join(DATA_DIR, ".jwt_secret")
+    if os.path.exists(secret_file):
+        with open(secret_file, "r") as f:
+            JWT_SECRET = f.read().strip()
+    else:
+        JWT_SECRET = secrets.token_urlsafe(32)
+        with open(secret_file, "w") as f:
+            f.write(JWT_SECRET)
+
 JWT_ALGORITHM = "HS256"
 
 _ALLOWED_ORIGINS = [
@@ -73,17 +91,31 @@ _ALLOWED_ORIGINS = [
 _RATE_LIMIT_QUERY = os.environ.get("RATE_LIMIT_QUERY", "60/minute")
 _RATE_LIMIT_INGEST = os.environ.get("RATE_LIMIT_INGEST", "10/minute")
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "data")
-
 
 def _get_user_data_dir(user_id: str) -> str:
     if user_id == "usr_default":
         return DATA_DIR
     return os.path.join(DATA_DIR, user_id)
 
-# ── In-Memory OTP Store (Production uses Supabase/Redis) ────────────────────
-_otp_store: Dict[str, str] = {}
+# ── Persistent Expiring OTP Store ───────────────────────────────────────────
+_OTP_FILE = os.path.join(DATA_DIR, "otp_store.json")
+
+def _load_otp_store() -> Dict[str, Dict[str, Any]]:
+    if os.path.exists(_OTP_FILE):
+        try:
+            with open(_OTP_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+def _save_otp_store(store: Dict[str, Dict[str, Any]]):
+    try:
+        with open(_OTP_FILE, "w") as f:
+            json.dump(store, f)
+    except Exception as exc:
+        logger.warning("Failed to save OTP store to file: %s", exc)
+
 _ingest_lock = threading.Lock()
 
 
@@ -118,13 +150,22 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+def _get_real_client_ip(request: Request) -> str:
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip:
+        return real_ip.strip()
+    return get_remote_address(request)
+
 # ── Rate limiting ─────────────────────────────────────────────────────────────
 try:
     from slowapi import Limiter, _rate_limit_exceeded_handler
     from slowapi.errors import RateLimitExceeded
     from slowapi.util import get_remote_address
 
-    limiter = Limiter(key_func=get_remote_address)
+    limiter = Limiter(key_func=_get_real_client_ip)
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     _SLOWAPI_AVAILABLE = True
@@ -340,9 +381,13 @@ def send_otp(req: OtpRequest):
     if "@" not in clean_email:
         raise _problem(400, "INVALID_EMAIL", "Please enter a valid email address.")
     
-    # Store demo code '123456' or generated code
     code = "123456"
-    _otp_store[clean_email] = code
+    store = _load_otp_store()
+    store[clean_email] = {
+        "code": code,
+        "expires_at": time.time() + 600,  # 10 minutes TTL
+    }
+    _save_otp_store(store)
     logger.info("Sent OTP code %s to %s", code, clean_email)
     return {"status": "otp_sent", "email": clean_email, "message": "Verification code sent (use 123456 for demo)."}
 
@@ -351,11 +396,24 @@ def send_otp(req: OtpRequest):
 def verify_otp(req: OtpVerifyRequest):
     """Verify Email OTP code and return JWT access token."""
     clean_email = req.email.strip().lower()
-    stored_code = _otp_store.get(clean_email, "123456")
+    store = _load_otp_store()
+    entry = store.get(clean_email)
     
+    stored_code = "123456"
+    if entry and isinstance(entry, dict):
+        stored_code = entry.get("code", "123456")
+        if time.time() > entry.get("expires_at", 0):
+            store.pop(clean_email, None)
+            _save_otp_store(store)
+            raise _problem(400, "EXPIRED_CODE", "Verification code has expired. Please request a new one.")
+
     if req.code.strip() != stored_code:
         raise _problem(400, "INVALID_CODE", "Invalid or expired verification code.")
         
+    if clean_email in store:
+        store.pop(clean_email, None)
+        _save_otp_store(store)
+
     user_id = f"usr_{uuid.uuid5(uuid.NAMESPACE_DNS, clean_email).hex[:12]}"
     token_payload = {
         "sub": user_id,

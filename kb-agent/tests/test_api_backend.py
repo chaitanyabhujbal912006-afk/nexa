@@ -144,6 +144,21 @@ class TestAuth:
         assert "access_token" in data
         assert data["email"] == "employee@company.com"
 
+    def test_verify_otp_expired(self, client):
+        import time
+        from api import _load_otp_store, _save_otp_store
+        store = _load_otp_store()
+        store["expired@company.com"] = {"code": "123456", "expires_at": time.time() - 100}
+        _save_otp_store(store)
+
+        res = client.post("/api/v1/auth/verify", json={"email": "expired@company.com", "code": "123456"})
+        assert res.status_code == 400
+        assert "expired_code" in res.json()["detail"]["type"]
+
+    def test_proxy_client_ip_extraction(self, client):
+        res = client.get("/api/v1/health", headers={"X-Forwarded-For": "203.0.113.195, 70.41.3.18"})
+        assert res.status_code == 200
+
 
 # ── PDF Reports ─────────────────────────────────────────────────────────────
 class TestReports:
