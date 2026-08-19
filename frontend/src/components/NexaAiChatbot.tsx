@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage, KnowledgeDocument, CitationItem } from '../types';
-import { MOCK_DOCUMENTS, SAMPLE_QUERIES } from '../data/mockKnowledge';
+import { runQuery } from '../api/knowledge';
+import type { ApiError } from '../api/client';
 import {
   Bot,
   Send,
@@ -41,61 +42,15 @@ export const NexaAiChatbot: React.FC<NexaAiChatbotProps> = ({ onInspectDocument 
       id: 'msg-welcome',
       role: 'assistant',
       content:
-        'Hello Architect. I am your **NEXA Neural Co-Pilot**. I am grounded directly in your tenant\'s 8 indexed enterprise files, vector embeddings, and temporal arbitration rules.\n\nAsk me anything about contracts, policies, SLA terms, or compliance guidelines with 100% cryptographic citation provenance.',
-      timestamp: '10:40 AM',
+        'Hello Architect. I am your **NEXA Neural Co-Pilot**. I am grounded directly in your backend knowledge base, vector embeddings, and temporal arbitration rules.\n\nAsk me anything about contracts, policies, SLA terms, or compliance guidelines with live citation provenance.',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       confidence: 99,
       confidence_level: 'HIGH',
       provider: 'Gemini 2.5 Flash',
-      latencyMs: 85,
-      citations: [
-        {
-          id: 1,
-          label: '1',
-          sourceDoc: 'NEXA_System_Architecture_v3.pdf',
-          section: 'Section 1.0 Executive Overview',
-          excerpt: 'NEXA Sovereign RAG architecture guarantees zero data leakage with real-time contradiction arbitration.',
-          matchScorePct: 99,
-        },
-      ],
-    },
-    {
-      id: 'msg-user-1',
-      role: 'user',
-      content: 'What is our current policy on bulk enterprise refunds and custom onboarding retainers?',
-      timestamp: '10:41 AM',
-    },
-    {
-      id: 'msg-ai-1',
-      role: 'assistant',
-      content:
-        'Based on verified corporate contracts, here is the current active policy:\n\n1. **Standard Hardware & Bulk Product Returns**: Must be initiated within **15 calendar days** of delivery through the RMA portal (superseding the deprecated 2021 30-day clause).\n2. **Custom Onboarding & Engineering Retainers**: Strictly **non-refundable** once architectural kickoff commences, per Master Services Agreement.\n3. **Damaged Transit Items**: 48-hour photographic documentation window required for immediate zero-cost dispatch.',
-      timestamp: '10:41 AM',
-      confidence: 98,
-      confidence_level: 'HIGH',
-      provider: 'Gemini 2.5 Flash',
-      latencyMs: 94,
-      conflictDetected: true,
-      conflictNote: 'Rule A applied: 2024 Refund Policy v2.0 (Mar 2024) supersedes 2021 Employee Handbook.',
-      citations: [
-        {
-          id: 1,
-          label: '1',
-          sourceDoc: 'refund_policy_v2.pdf',
-          section: 'Page 3, Section 2.1',
-          excerpt: 'Enterprise bulk order refunds must be submitted within 15 calendar days of receipt.',
-          matchScorePct: 98,
-        },
-        {
-          id: 2,
-          label: '2',
-          sourceDoc: 'enterprise_terms.pdf',
-          section: 'Clause 4B Retainer Inclusions',
-          excerpt: 'Engineering onboarding fees and architectural retainers become non-refundable upon project kickoff.',
-          matchScorePct: 96,
-        },
-      ],
+      latencyMs: 15,
     },
   ]);
+
 
   // Input & Controls State
   const [inputText, setInputText] = useState('');
@@ -133,8 +88,8 @@ export const NexaAiChatbot: React.FC<NexaAiChatbotProps> = ({ onInspectDocument 
     { label: '⚖️ Resolve Policy Contradiction', text: 'Compare 2021 Employee Handbook vs 2024 Updated Benefits policy for contradictions.' },
   ];
 
-  // Send Message Handler
-  const handleSendMessage = (textToSend?: string) => {
+  // Send Message Handler — connected to real RAG backend API
+  const handleSendMessage = async (textToSend?: string) => {
     const content = (textToSend || inputText).trim();
     if (!content || isTyping) return;
 
@@ -152,114 +107,49 @@ export const NexaAiChatbot: React.FC<NexaAiChatbotProps> = ({ onInspectDocument 
     setAttachedFiles([]);
     setIsTyping(true);
 
-    // Simulate RAG Grounded Answer Synthesis
-    setTimeout(() => {
-      let responseText = `I have verified your query against **${selectedScope}** across our active vector collection.`;
-      let conf = 98;
-      let citationsList: CitationItem[] = [
-        {
-          id: 1,
-          label: '1',
-          sourceDoc: 'NEXA_System_Architecture_v3.pdf',
-          section: 'Section 3.2 Tenant Isolation',
-          excerpt: 'All semantic chunk queries undergo strict cosine scoring and tenant namespace verification.',
-          matchScorePct: 98,
-        },
-      ];
-      let hasConflict = false;
-      let conflictMsg = '';
+    try {
+      // Pass conversation history to backend for context-aware multi-turn RAG
+      const history = messages
+        .filter((m) => m.id !== 'msg-welcome')
+        .map((m) => ({ role: m.role, content: m.content }));
 
-      const lower = content.toLowerCase();
-
-      if (lower.includes('refund') || lower.includes('return')) {
-        responseText =
-          '**Enterprise Refund & Retainer Summary**:\n\n• **Hardware & Bulk Shipments**: Returns accepted within **15 calendar days** via standard RMA.\n• **Professional Services**: Onboarding retainers are **strictly non-refundable** upon project kickoff (per MSA Section 4B).\n• **Transit Damage**: 48h notice required for immediate zero-charge replacement.';
-        conf = 99;
-        hasConflict = true;
-        conflictMsg = 'Rule A applied: 2024 Refund Policy v2.0 supersedes 2021 handbook.';
-        citationsList = [
-          {
-            id: 1,
-            label: '1',
-            sourceDoc: 'refund_policy_v2.pdf',
-            section: 'Page 3, Section 2.1',
-            excerpt: 'Enterprise bulk order refunds must be submitted within 15 calendar days of receipt.',
-            matchScorePct: 99,
-          },
-          {
-            id: 2,
-            label: '2',
-            sourceDoc: 'enterprise_terms.pdf',
-            section: 'Clause 4B',
-            excerpt: 'Engineering onboarding fees and architectural retainers become non-refundable upon project kickoff.',
-            matchScorePct: 97,
-          },
-        ];
-      } else if (lower.includes('sabbatical') || lower.includes('leave') || lower.includes('benefit')) {
-        responseText =
-          '**Paid Sabbatical Entitlement**:\n\n• **Eligibility**: Regular full-time employees who have completed **5 years of continuous service**.\n• **Duration**: **15 paid calendar days** per qualifying tenure milestone.\n• **Scheduling**: Must be submitted 60 days in advance with department lead approval.';
-        conf = 98;
-        hasConflict = true;
-        conflictMsg = 'Rule A applied: Updated Benefits 2024 (15 days) supersedes 2021 Handbook (30 days).';
-        citationsList = [
-          {
-            id: 1,
-            label: '1',
-            sourceDoc: 'Updated_Benefits_2024.docx',
-            section: 'Section 4.2 Sabbatical Guidelines',
-            excerpt: 'Employees receive 15 days of paid sabbatical upon reaching 5 consecutive years of employment.',
-            matchScorePct: 98,
-          },
-        ];
-      } else if (lower.includes('soc') || lower.includes('key') || lower.includes('security') || lower.includes('pii')) {
-        responseText =
-          '**SOC 2 & Cryptographic Security Controls**:\n\n• **Key Rotation**: Master encryption keys (AES-256) are rotated automatically every **90 days** in HSM.\n• **PII Redaction**: All vector ingestions pass through real-time NER filters to strip SSNs, credit cards, and private phone numbers before indexing.\n• **Tenant Isolation**: Cryptographic namespace keys prevent cross-tenant vector retrieval.';
-        conf = 99;
-        citationsList = [
-          {
-            id: 1,
-            label: '1',
-            sourceDoc: 'SOC2_Compliance_2024.pdf',
-            section: 'Security Audit § 4.1',
-            excerpt: 'Automated cryptographic rotation of master keys occurs every 90 days with audit ledger logging.',
-            matchScorePct: 99,
-          },
-        ];
-      } else if (lower.includes('sla') || lower.includes('uptime') || lower.includes('penalty')) {
-        responseText =
-          '**SLA Tiers & Downtime Credits**:\n\n• **99.9% - 99.5% Uptime**: 10% monthly service credit.\n• **99.0% - 99.4% Uptime**: 25% monthly service credit.\n• **< 99.0% Uptime**: 50% monthly service credit + right of immediate contract renegotiation.';
-        conf = 97;
-        citationsList = [
-          {
-            id: 1,
-            label: '1',
-            sourceDoc: 'Hardware_SLA_Master.pdf',
-            section: 'Section 5.3 Service Credit Schedule',
-            excerpt: 'Monthly SLA credit schedule is tiered from 10% to 50% based on verified outage minutes.',
-            matchScorePct: 97,
-          },
-        ];
-      }
+      const result = await runQuery(content, topK, history);
 
       const aiMsg: ChatMessage = {
         id: `ai-${Date.now()}`,
         role: 'assistant',
-        content: responseText,
+        content: result.answerText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        confidence: conf,
-        confidence_level: 'HIGH',
-        provider: selectedModel === 'gemini' ? 'Gemini 2.5 Flash' : selectedModel === 'groq' ? 'Groq LLaMA 3.3 70B' : 'NEXA Sovereign Core',
-        latencyMs: Math.floor(Math.random() * 40) + 75,
-        citations: citationsList,
-        conflictDetected: hasConflict,
-        conflictNote: conflictMsg,
+        confidence: result.confidence,
+        confidence_level: result.confidence_level,
+        provider: result.provider === 'gemini' ? 'Gemini 2.5 Flash' : 'Groq LLaMA 3.3 70B',
+        latencyMs: result.latencyMs,
+        citations: result.citations,
+        conflictDetected: result.conflictDetected,
+        conflictNote: result.conflictDetails ? result.conflictDetails.verdict : undefined,
       };
 
       setMessages((prev) => [...prev, aiMsg]);
-      setIsTyping(false);
       playResolvedChime();
-    }, 700);
+    } catch (err) {
+      const apiErr = err as ApiError;
+      const errorMsg: ChatMessage = {
+        id: `ai-err-${Date.now()}`,
+        role: 'assistant',
+        content: `⚠ Unable to process query with backend: ${apiErr.message}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        confidence: 0,
+        confidence_level: 'NONE',
+        provider: 'Gemini 2.5 Flash',
+        latencyMs: 0,
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+      playAlertWarble();
+    } finally {
+      setIsTyping(false);
+    }
   };
+
 
   // Export chat
   const handleExportChat = () => {
@@ -529,8 +419,20 @@ export const NexaAiChatbot: React.FC<NexaAiChatbotProps> = ({ onInspectDocument 
                           key={c.id}
                           onClick={() => {
                             playTactileClick();
-                            const matched = MOCK_DOCUMENTS.find((d) => d.title === c.sourceDoc) || MOCK_DOCUMENTS[0];
-                            if (onInspectDocument) onInspectDocument(matched);
+                            if (onInspectDocument) {
+                              onInspectDocument({
+                                id: c.sourceDoc,
+                                title: c.sourceDoc,
+                                type: (c.sourceType as any) || 'pdf',
+                                date: c.docDate || new Date().toISOString().split('T')[0],
+                                department: 'General',
+                                status: 'active',
+                                confidence: c.matchScorePct || 98,
+                                conflictsCount: 0,
+                                size: '1.2 MB',
+                                vectorCount: 16,
+                              });
+                            }
                           }}
                           className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#a855f7]/50 text-[10px] font-mono text-[#cbd5e1] hover:text-white transition-all flex items-center gap-1.5 cursor-pointer group"
                         >

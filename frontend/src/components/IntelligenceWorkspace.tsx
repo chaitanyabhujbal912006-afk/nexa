@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { UserSession, KnowledgeDocument, WorkspaceTab, QueryResult, ConflictRecord } from '../types';
-import { MOCK_DOCUMENTS, SAMPLE_QUERIES, CONFLICT_RECORDS } from '../data/mockKnowledge';
 import { runQuery, listDocuments, uploadDocument, deleteDocument, scanConflicts } from '../api/knowledge';
 import type { ApiError } from '../api/client';
+
 
 import { NexaAiChatbot } from './NexaAiChatbot';
 import { NexaBentoOverview } from './NexaBentoOverview';

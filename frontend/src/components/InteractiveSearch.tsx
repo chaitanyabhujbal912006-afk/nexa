@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Mic, AlertTriangle, FileText, CheckCircle2, Copy, Check, CornerDownLeft, Volume2, Shield, Sparkles, Filter, Database } from 'lucide-react';
-import { SAMPLE_QUERIES } from '../data/mockKnowledge';
+import { runQuery } from '../api/knowledge';
+import type { ApiError } from '../api/client';
 import { QueryResult } from '../types';
 import { playTactileClick, playResolvedChime, playAlertWarble } from '../utils/audio';
 
@@ -14,38 +15,46 @@ export const InteractiveSearch: React.FC<InteractiveSearchProps> = ({
   defaultQuery,
 }) => {
   const [searchTerm, setSearchTerm] = useState(defaultQuery || '');
-  const [activeResult, setActiveResult] = useState<QueryResult | null>(
-    SAMPLE_QUERIES["What is our current refund policy?"]
-  );
+  const [activeResult, setActiveResult] = useState<QueryResult | null>(null);
   const [isSearching, setIsSearching] = useState(false);
-  const [selectedCitation, setSelectedCitation] = useState<number | null>(1);
+  const [selectedCitation, setSelectedCitation] = useState<number | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const handleQuery = (query: string) => {
+  const handleQuery = async (query: string) => {
     playTactileClick();
     setSearchTerm(query);
     setIsSearching(true);
     setSelectedCitation(null);
 
-    setTimeout(() => {
-      const matched =
-        SAMPLE_QUERIES[query] ||
-        SAMPLE_QUERIES["What is our current refund policy?"];
-      
-      setActiveResult(matched);
-      setIsSearching(false);
-      
-      if (matched.conflictDetected) {
+    try {
+      const result = await runQuery(query, 5, []);
+      setActiveResult(result);
+      if (result.conflictDetected) {
         playAlertWarble();
       } else {
         playResolvedChime();
       }
-
       if (onSelectResult) {
-        onSelectResult(matched);
+        onSelectResult(result);
       }
-    }, 350);
+    } catch (err) {
+      const apiErr = err as ApiError;
+      const errorResult: QueryResult = {
+        id: `err-${Date.now()}`,
+        query,
+        answerText: `⚠ Query failed: ${apiErr.message}`,
+        confidence: 0,
+        confidence_level: 'NONE',
+        sourcesVerifiedCount: 0,
+        conflictDetected: false,
+        citations: [],
+      };
+      setActiveResult(errorResult);
+      playAlertWarble();
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {
