@@ -6,7 +6,7 @@ No Streamlit dependency here.
 
 import os
 
-GROQ_MODEL = "openai/gpt-oss-120b"
+GROQ_MODEL = "llama-3.3-70b-versatile"
 GEMINI_MODEL = "gemini-2.0-flash"
 
 

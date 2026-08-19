@@ -363,12 +363,11 @@ def _conflicts_to_out(conflicts: list) -> List[ConflictOut]:
     ]
 
 def _kb_file_stats() -> Dict[str, int]:
-    return {
-        "pdfs": len(glob.glob(os.path.join(DATA_DIR, "pdf_src", "*.pdf"))),
-        "excel": len(glob.glob(os.path.join(DATA_DIR, "*.xlsx"))),
-        "csv": len(glob.glob(os.path.join(DATA_DIR, "*.csv"))),
-        "emails": len(glob.glob(os.path.join(DATA_DIR, "emails", "*.*"))),
-    }
+    pdfs = len(glob.glob(os.path.join(DATA_DIR, "**", "*.pdf"), recursive=True))
+    excel = len(glob.glob(os.path.join(DATA_DIR, "**", "*.xlsx"), recursive=True))
+    csv = len(glob.glob(os.path.join(DATA_DIR, "**", "*.csv"), recursive=True))
+    emails = len(glob.glob(os.path.join(DATA_DIR, "**", "*.eml"), recursive=True)) + len(glob.glob(os.path.join(DATA_DIR, "**", "emails", "*.*"), recursive=True))
+    return {"pdfs": pdfs, "excel": excel, "csv": csv, "emails": emails}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -451,7 +450,8 @@ def get_stats(user: Dict[str, Any] = Depends(get_current_user)):
         import chromadb
         client = chromadb.PersistentClient(path=os.path.join(BASE_DIR, "chroma_db"))
         col = client.get_or_create_collection("sme_knowledge_base")
-        res = col.get(include=["metadatas"])
+        user_id = user["user_id"]
+        res = col.get(where={"user_id": user_id}, include=["metadatas"])
         metas = res.get("metadatas") or []
         breakdown: Dict[str, int] = {}
         sources: set = set()
@@ -490,6 +490,7 @@ def query_knowledge_base(req: QueryRequest, request: Request, user: Dict[str, An
             call_id=call_id,
             latency_ms=latency_ms,
             provider=get_active_provider(),
+            user_id=user["user_id"],
         )
 
         return QueryResponse(
@@ -664,7 +665,7 @@ def generate_report_pdf(req: PdfReportRequest, user: Dict[str, Any] = Depends(ge
 @app.get("/api/v1/audit", tags=["System"])
 def get_audit_log(n: int = 50, user: Dict[str, Any] = Depends(get_current_user)):
     n = max(1, min(n, 200))
-    entries = read_recent_entries(n=n)
+    entries = read_recent_entries(n=n, user_id=user["user_id"])
     return {
         "total_returned": len(entries),
         "entries": entries,

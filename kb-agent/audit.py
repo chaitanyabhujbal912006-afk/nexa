@@ -105,6 +105,7 @@ def log_qa_event(
     call_id: Optional[str] = None,
     latency_ms: Optional[float] = None,
     provider: Optional[str] = None,
+    user_id: Optional[str] = "usr_default",
 ) -> str:
     """
     Append a structured, UTC-timestamped Q&A audit entry.
@@ -117,6 +118,7 @@ def log_qa_event(
         call_id: Optional trace ID (auto-generated UUID4 if not provided).
         latency_ms: Optional end-to-end processing time in milliseconds.
         provider: Optional LLM provider label string.
+        user_id: Optional user identifier string.
 
     Returns:
         The call_id used for this event (for correlation).
@@ -129,6 +131,7 @@ def log_qa_event(
     entry = {
         "schema_version": SCHEMA_VERSION,
         "call_id": call_id,
+        "user_id": user_id or "usr_default",
         "timestamp": datetime.now(tz=timezone.utc).isoformat(),
         "query": query,
         "answer_preview": answer[:500] if answer else "",
@@ -176,10 +179,10 @@ def log_qa_event(
     return call_id
 
 
-def read_recent_entries(n: int = 50) -> List[dict]:
+def read_recent_entries(n: int = 50, user_id: Optional[str] = None) -> List[dict]:
     """
     Read the N most recent audit log entries (from tail of file).
-    Returns parsed dicts, skipping malformed lines.
+    Returns parsed dicts matching user_id (if specified), skipping malformed lines.
     """
     if not os.path.isfile(LOG_FILE):
         return []
@@ -193,7 +196,10 @@ def read_recent_entries(n: int = 50) -> List[dict]:
             if not line:
                 continue
             try:
-                entries.append(json.loads(line))
+                data = json.loads(line)
+                if user_id is not None and data.get("user_id", "usr_default") != user_id:
+                    continue
+                entries.append(data)
             except json.JSONDecodeError:
                 continue
             if len(entries) >= n:
