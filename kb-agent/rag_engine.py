@@ -334,6 +334,23 @@ def generate_answer(query, hits, conflicts, llm_call_fn=None):
     return answer, context_block
 
 
+def _clean_unicode_for_pdf(text: str) -> str:
+    """Replaces common non-latin-1 characters (like smart quotes, em-dashes) with basic ASCII representations."""
+    replacements = {
+        "\u201c": '"',
+        "\u201d": '"',
+        "\u2018": "'",
+        "\u2019": "'",
+        "\u2013": "-",
+        "\u2014": "-",
+        "\u2022": "*",
+        "\u2026": "...",
+    }
+    for orig, rep in replacements.items():
+        text = text.replace(orig, rep)
+    return text.encode("latin-1", "replace").decode("latin-1")
+
+
 def generate_pdf_report(title: str, summary_text: str, citations: list = None, conflicts: list = None) -> bytes:
     """Generates an executive PDF report summarizing AI insights, citations, and conflicts."""
     pdf = FPDF()
@@ -357,7 +374,7 @@ def generate_pdf_report(title: str, summary_text: str, citations: list = None, c
     pdf.set_font("Helvetica", "", 10)
     pdf.set_text_color(51, 65, 85)
     # Sanitize unicode characters for Standard FPDF fonts
-    safe_text = summary_text.encode("latin-1", "replace").decode("latin-1")
+    safe_text = _clean_unicode_for_pdf(summary_text)
     pdf.multi_cell(0, 6, safe_text)
     pdf.ln(5)
     
@@ -371,7 +388,7 @@ def generate_pdf_report(title: str, summary_text: str, citations: list = None, c
         pdf.set_text_color(51, 65, 85)
         for c in conflicts:
             conf_str = f"Topic: {c.get('topic', 'General')}\n- Trusted Source: {c.get('trusted_source', '?')} ({c.get('trusted_date', '?')})\n- Superseded: {', '.join(o.get('citation', '?') for o in c.get('outdated_sources', []))}\n"
-            pdf.multi_cell(0, 5, conf_str.encode("latin-1", "replace").decode("latin-1"))
+            pdf.multi_cell(0, 5, _clean_unicode_for_pdf(conf_str))
             pdf.ln(2)
 
     # Citations Section if any
