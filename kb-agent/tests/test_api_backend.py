@@ -176,13 +176,19 @@ class TestQuery:
 class TestUpload:
     def test_upload_pdf(self, client):
         content = b"%PDF-1.4 Mock PDF content"
-        res = client.post(
-            "/api/v1/upload",
-            files={"file": ("test_doc.pdf", content, "application/pdf")},
-        )
-        assert res.status_code == 200
-        data = res.json()
-        assert data["file"] == "test_doc.pdf"
+        try:
+            res = client.post(
+                "/api/v1/upload",
+                files={"file": ("test_doc.pdf", content, "application/pdf")},
+            )
+            assert res.status_code == 200
+            data = res.json()
+            assert data["file"] == "test_doc.pdf"
+        finally:
+            import os
+            filepath = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "pdf_src", "test_doc.pdf")
+            if os.path.exists(filepath):
+                os.remove(filepath)
 
     def test_upload_forbidden_extension(self, client):
         content = b"#!/bin/bash\necho hello"

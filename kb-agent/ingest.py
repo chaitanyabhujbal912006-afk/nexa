@@ -267,52 +267,55 @@ def ingest_pdfs():
     """Each PDF page -> chunked. Date pulled from metadata/header/body/filename."""
     docs, metas, ids = [], [], []
     for path in glob.glob(os.path.join(DATA_DIR, "pdf_src", "*.pdf")):
-        reader = PdfReader(path)
         fname = os.path.basename(path)
-        full_text = "\n".join(page.extract_text() or "" for page in reader.pages)
+        try:
+            reader = PdfReader(path)
+            full_text = "\n".join(page.extract_text() or "" for page in reader.pages)
 
-        # OCR Fallback for scanned/image PDFs if direct text extraction yields empty string
-        if len(full_text.strip()) < 30:
-            try:
-                import pytesseract
-                from pdf2image import convert_from_path
-                images = convert_from_path(path)
-                ocr_text = "\n".join(pytesseract.image_to_string(img) for img in images)
-                if ocr_text.strip():
-                    full_text = ocr_text
-            except Exception:
-                pass  # pytesseract/poppler not installed; fallback to raw text
+            # OCR Fallback for scanned/image PDFs if direct text extraction yields empty string
+            if len(full_text.strip()) < 30:
+                try:
+                    import pytesseract
+                    from pdf2image import convert_from_path
+                    images = convert_from_path(path)
+                    ocr_text = "\n".join(pytesseract.image_to_string(img) for img in images)
+                    if ocr_text.strip():
+                        full_text = ocr_text
+                except Exception:
+                    pass  # pytesseract/poppler not installed; fallback to raw text
 
-        doc_date = extract_pdf_date(reader, full_text, fname)
+            doc_date = extract_pdf_date(reader, full_text, fname)
 
-        # Split by section headers (e.g. "Section 4: ...", "Chapter 1...", "1.0 ...") so citations are meaningful
-        sections = re.split(r"((?:Section|Chapter|\d+\.\d+)\s*[^:\n]*:?[^\n]*)", full_text, flags=re.I)
-        current_section = "Header"
-        buffer = ""
-        parsed_sections = []
-        for part in sections:
-            if re.match(r"(?:Section|Chapter|\d+\.\d+)\s*", part, re.I):
-                if buffer.strip():
-                    parsed_sections.append((current_section, buffer))
-                current_section = part.strip()
-                buffer = ""
-            else:
-                buffer += part
-        if buffer.strip():
-            parsed_sections.append((current_section, buffer))
+            # Split by section headers (e.g. "Section 4: ...", "Chapter 1...", "1.0 ...") so citations are meaningful
+            sections = re.split(r"((?:Section|Chapter|\d+\.\d+)\s*[^:\n]*:?[^\n]*)", full_text, flags=re.I)
+            current_section = "Header"
+            buffer = ""
+            parsed_sections = []
+            for part in sections:
+                if re.match(r"(?:Section|Chapter|\d+\.\d+)\s*", part, re.I):
+                    if buffer.strip():
+                        parsed_sections.append((current_section, buffer))
+                    current_section = part.strip()
+                    buffer = ""
+                else:
+                    buffer += part
+            if buffer.strip():
+                parsed_sections.append((current_section, buffer))
 
-        for idx, (section_title, section_text) in enumerate(parsed_sections):
-            topic = sanitize_topic(section_title if section_title != "Header" else fname)
-            for c_idx, chunk in enumerate(chunk_text(section_text, chunk_size=150)):
-                docs.append(chunk)
-                metas.append({
-                    "source_type": "pdf",
-                    "source_name": fname,
-                    "doc_date": doc_date,
-                    "section": section_title,
-                    "topic": topic,
-                })
-                ids.append(f"pdf-{fname}-{idx}-{c_idx}")
+            for idx, (section_title, section_text) in enumerate(parsed_sections):
+                topic = sanitize_topic(section_title if section_title != "Header" else fname)
+                for c_idx, chunk in enumerate(chunk_text(section_text, chunk_size=150)):
+                    docs.append(chunk)
+                    metas.append({
+                        "source_type": "pdf",
+                        "source_name": fname,
+                        "doc_date": doc_date,
+                        "section": section_title,
+                        "topic": topic,
+                    })
+                    ids.append(f"pdf-{fname}-{idx}-{c_idx}")
+        except Exception as err:
+            print(f"Warning: Failed to parse PDF file {fname}: {err}")
     return docs, metas, ids
 
 
