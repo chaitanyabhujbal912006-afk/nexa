@@ -6,3 +6,14 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Secrets — never commit these
+**/.streamlit/secrets.toml
+**/data/.jwt_secret
+**/data/otp_store.json
+
+# Generated/cache dirs
+**/__pycache__/
+**/.pytest_cache/
+**/chroma_db/
+**/*.pyc
