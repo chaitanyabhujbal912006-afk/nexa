@@ -5,6 +5,13 @@ Lutra UI inspired design system + WCAG 2.1 AA/AAA accessibility.
 
 import os
 import sys
+
+# Force UTF-8 output on Windows to prevent UnicodeEncodeError with emoji
+if sys.platform == "win32":
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+
 import glob
 import html
 import json
