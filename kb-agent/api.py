@@ -92,7 +92,8 @@ JWT_ALGORITHM = "HS256"
 _ALLOWED_ORIGINS = [
     o.strip()
     for o in os.environ.get(
-        "NEXA_ALLOWED_ORIGINS", "http://localhost:8501,http://localhost:3000"
+        "NEXA_ALLOWED_ORIGINS",
+        "https://nexa-psi-sooty.vercel.app,https://nexa-frontend.vercel.app,http://localhost:8501,http://localhost:3000",
     ).split(",")
 ]
 _RATE_LIMIT_QUERY = os.environ.get("RATE_LIMIT_QUERY", "60/minute")
