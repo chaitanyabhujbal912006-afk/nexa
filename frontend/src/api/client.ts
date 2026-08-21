@@ -16,7 +16,9 @@ export interface ApiError {
   message: string;
 }
 
-const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) ?? 'http://localhost:8000';
+const BASE_URL =
+  (import.meta.env.VITE_API_BASE_URL as string) ||
+  'https://nexa-api-6hh5.onrender.com';
 const JWT_KEY = 'nexa_jwt';
 
 /** Returns the stored JWT token or null */
