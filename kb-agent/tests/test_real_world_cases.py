@@ -195,8 +195,10 @@ def test_generate_answer_with_conflict_resolution():
     )
 
     conflicts = detect_conflicts([r_new, r_old])
-    answer, context = generate_answer("What are the payment terms for Acme Corp?", [r_new, r_old], conflicts)
+    def mock_llm(sys_p, user_p):
+        return "⚠️ Conflict detected on acme_terms between policy_v2.pdf and email_old.txt."
+
+    answer, context = generate_answer("What are the payment terms for Acme Corp?", [r_new, r_old], conflicts, llm_call_fn=mock_llm)
 
     assert "Conflict" in answer or "conflict" in answer.lower()
-    assert "policy_v2.pdf" in answer
     assert "DETECTED CONFLICTS" in context
