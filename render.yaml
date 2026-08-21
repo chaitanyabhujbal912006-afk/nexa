@@ -1,16 +1,29 @@
 services:
   - type: web
     name: nexa-api
-    env: python
+    env: docker
     plan: free
     rootDir: kb-agent
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn api:app --host 0.0.0.0 --port $PORT
+    dockerfilePath: ./Dockerfile
     healthCheckPath: /api/v1/health
     envVars:
       - key: GROQ_API_KEY
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      - key: PINECONE_API_KEY
+        sync: false
+      - key: PINECONE_INDEX
+        value: nexa-knowledge-base
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        value: Nexa <onboarding@resend.dev>
+      - key: JWT_SECRET
+        sync: false
       - key: NEXA_ALLOWED_ORIGINS
-        value: https://nexa-frontend.vercel.app,http://localhost:3000
+        value: https://nexa-frontend.vercel.app,http://localhost:3000,http://localhost:8501
+      - key: RATE_LIMIT_QUERY
+        value: 60/minute
+      - key: RATE_LIMIT_INGEST
+        value: 10/minute
