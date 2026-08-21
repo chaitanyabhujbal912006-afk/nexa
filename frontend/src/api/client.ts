@@ -18,16 +18,20 @@ export interface ApiError {
 
 function getBaseUrl(): string {
   const envUrl = (import.meta.env.VITE_API_BASE_URL as string) || '';
+  let target = envUrl;
   if (
     typeof window !== 'undefined' &&
     window.location.hostname !== 'localhost' &&
     window.location.hostname !== '127.0.0.1'
   ) {
     if (!envUrl || envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) {
-      return 'https://nexa-api-6hh5.onrender.com';
+      target = 'https://nexa-api-6hh5.onrender.com';
     }
   }
-  return envUrl || 'https://nexa-api-6hh5.onrender.com';
+  if (!target) {
+    target = 'https://nexa-api-6hh5.onrender.com';
+  }
+  return target.replace(/\/+$/, ''); // Strip trailing slash to avoid double-slash URL errors
 }
 
 const BASE_URL = getBaseUrl();
@@ -73,12 +77,49 @@ function buildMultipartHeaders(): Headers {
   return headers;
 }
 
+/**
+ * Fetch wrapper with 60s timeout and exponential backoff retry for Render cold-starts.
+ * Retries on network errors and 502/503/504 gateway responses while backend warms up.
+ */
+async function fetchWithRetry(url: string, init?: RequestInit, maxRetries = 3): Promise<Response> {
+  let attempt = 0;
+  while (attempt <= maxRetries) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s cold-start timeout
+
+      const response = await fetch(url, {
+        ...init,
+        signal: init?.signal ?? controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      // Retry on 502/503/504 while Render cold-starts
+      if ((response.status === 502 || response.status === 503 || response.status === 504) && attempt < maxRetries) {
+        attempt++;
+        await new Promise((resolve) => setTimeout(resolve, attempt * 3000));
+        continue;
+      }
+
+      return response;
+    } catch (err) {
+      if (attempt < maxRetries) {
+        attempt++;
+        await new Promise((resolve) => setTimeout(resolve, attempt * 3000));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error('Max retries exceeded');
+}
+
 async function parseError(response: Response): Promise<ApiError> {
   let message = `Request failed (HTTP ${response.status})`;
   let code = 'UNKNOWN_ERROR';
   try {
     const body = await response.json();
-    // RFC 7807 format: { type, title, status, detail }
     if (body?.detail) {
       message = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail);
     }
@@ -89,7 +130,6 @@ async function parseError(response: Response): Promise<ApiError> {
     // response body was not JSON
   }
 
-  // Map common HTTP status codes to user-friendly messages
   if (response.status === 401) {
     message = 'Your session has expired. Please sign in again.';
     code = 'UNAUTHORIZED';
@@ -110,8 +150,9 @@ async function parseError(response: Response): Promise<ApiError> {
 /** Generic JSON fetch. Throws ApiError on non-2xx. */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
+  const fullUrl = `${BASE_URL}${path.startsWith('/') ? path : '/' + path}`;
   try {
-    response = await fetch(`${BASE_URL}${path}`, {
+    response = await fetchWithRetry(fullUrl, {
       ...init,
       headers: buildHeaders(init?.headers),
     });
@@ -128,7 +169,6 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     throw err;
   }
 
-  // 204 No Content
   if (response.status === 204) return undefined as unknown as T;
 
   return response.json() as Promise<T>;
@@ -137,8 +177,9 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 /** Multipart upload fetch (no Content-Type header — browser sets boundary). */
 export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
   let response: Response;
+  const fullUrl = `${BASE_URL}${path.startsWith('/') ? path : '/' + path}`;
   try {
-    response = await fetch(`${BASE_URL}${path}`, {
+    response = await fetchWithRetry(fullUrl, {
       method: 'POST',
       headers: buildMultipartHeaders(),
       body: formData,
@@ -162,8 +203,9 @@ export async function apiUpload<T>(path: string, formData: FormData): Promise<T>
 /** Download a binary response as a Blob (used for PDF report). */
 export async function apiDownload(path: string, body: unknown): Promise<Blob> {
   let response: Response;
+  const fullUrl = `${BASE_URL}${path.startsWith('/') ? path : '/' + path}`;
   try {
-    response = await fetch(`${BASE_URL}${path}`, {
+    response = await fetchWithRetry(fullUrl, {
       method: 'POST',
       headers: buildHeaders(),
       body: JSON.stringify(body),
