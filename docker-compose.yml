@@ -9,11 +9,12 @@ services:
     environment:
       - GROQ_API_KEY=${GROQ_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - PINECONE_API_KEY=${PINECONE_API_KEY}
+      - PINECONE_INDEX=${PINECONE_INDEX:-nexa-knowledge-base}
       - APP_PASSWORD=${APP_PASSWORD:-}
       - NEXA_WEBHOOK_URL=${NEXA_WEBHOOK_URL:-}
     volumes:
       - ./kb-agent/data:/app/data
-      - ./kb-agent/chroma_db:/app/chroma_db
     restart: unless-stopped
 
   nexa-api:
@@ -27,10 +28,14 @@ services:
     environment:
       - GROQ_API_KEY=${GROQ_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - PINECONE_API_KEY=${PINECONE_API_KEY}
+      - PINECONE_INDEX=${PINECONE_INDEX:-nexa-knowledge-base}
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL:-Nexa <onboarding@resend.dev>}
+      - JWT_SECRET=${JWT_SECRET}
       - NEXA_API_KEY=${NEXA_API_KEY:-}
       - NEXA_ALLOWED_ORIGINS=${NEXA_ALLOWED_ORIGINS:-http://localhost:8501,http://localhost:3000}
       - NEXA_WEBHOOK_URL=${NEXA_WEBHOOK_URL:-}
     volumes:
       - ./kb-agent/data:/app/data
-      - ./kb-agent/chroma_db:/app/chroma_db
     restart: unless-stopped
