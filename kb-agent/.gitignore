@@ -12,6 +12,10 @@ __pycache__/
 # Audit logs
 audit_log.jsonl
 
+# Environment variable files
+.env*
+!.env.example
+
 # Runtime secrets and persistent data stores
 data/.jwt_secret
 data/otp_store.json
