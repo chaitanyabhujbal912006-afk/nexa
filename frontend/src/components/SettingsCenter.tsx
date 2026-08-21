@@ -34,7 +34,7 @@ export const SettingsCenter: React.FC<SettingsCenterProps> = ({
   // Submodule 2: API & Connection State
   const [backendUrl, setBackendUrl] = useState('https://api.nexa-neural.internal/v1');
   const [useLiveBackend, setUseLiveBackend] = useState(true);
-  const [activeProvider, setActiveProvider] = useState<'gemini' | 'groq'>('gemini');
+  const [activeProvider, setActiveProvider] = useState<'groq'>('groq');
   const [geminiKeyMasked, setGeminiKeyMasked] = useState('AIzaSyD-••••••••••••••••••••••••');
   const [groqKeyMasked, setGroqKeyMasked] = useState('gsk_••••••••••••••••••••••••••••');
   const [showGeminiKey, setShowGeminiKey] = useState(false);

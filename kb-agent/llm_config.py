@@ -67,32 +67,18 @@ def _call_groq(system_prompt: str, user_prompt: str) -> str:
 
 
 def call_llm(system_prompt: str, user_prompt: str) -> str:
-    errors = []
-    if os.environ.get("GEMINI_API_KEY"):
-        try:
-            return _call_gemini(system_prompt, user_prompt)
-        except Exception as e:
-            errors.append(f"Gemini error: {e}")
     if os.environ.get("GROQ_API_KEY"):
-        try:
-            return _call_groq(system_prompt, user_prompt)
-        except Exception as e:
-            errors.append(f"Groq error: {e}")
-
-    if errors:
-        raise RuntimeError(" | ".join(errors))
-    raise RuntimeError("No LLM API key configured.")
+        return _call_groq(system_prompt, user_prompt)
+    raise RuntimeError("GROQ_API_KEY is not configured.")
 
 
 def get_active_provider() -> str:
-    if os.environ.get("GEMINI_API_KEY"):
-        return f"GEMINI · {GEMINI_MODEL}"
     if os.environ.get("GROQ_API_KEY"):
         return f"GROQ · {GROQ_MODEL}"
-    return "DEMO MODE (no LLM configured)"
+    return "DEMO MODE (no GROQ_API_KEY set)"
 
 
 def get_llm_fn():
-    if os.environ.get("GEMINI_API_KEY") or os.environ.get("GROQ_API_KEY"):
+    if os.environ.get("GROQ_API_KEY"):
         return call_llm
     return None

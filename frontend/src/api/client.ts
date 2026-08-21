@@ -16,9 +16,21 @@ export interface ApiError {
   message: string;
 }
 
-const BASE_URL =
-  (import.meta.env.VITE_API_BASE_URL as string) ||
-  'https://nexa-api-6hh5.onrender.com';
+function getBaseUrl(): string {
+  const envUrl = (import.meta.env.VITE_API_BASE_URL as string) || '';
+  if (
+    typeof window !== 'undefined' &&
+    window.location.hostname !== 'localhost' &&
+    window.location.hostname !== '127.0.0.1'
+  ) {
+    if (!envUrl || envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) {
+      return 'https://nexa-api-6hh5.onrender.com';
+    }
+  }
+  return envUrl || 'https://nexa-api-6hh5.onrender.com';
+}
+
+const BASE_URL = getBaseUrl();
 const JWT_KEY = 'nexa_jwt';
 
 /** Returns the stored JWT token or null */

@@ -46,7 +46,7 @@ export const NexaAiChatbot: React.FC<NexaAiChatbotProps> = ({ onInspectDocument 
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       confidence: 99,
       confidence_level: 'HIGH',
-      provider: 'Gemini 2.5 Flash',
+      provider: 'Groq Compound',
       latencyMs: 15,
     },
   ]);
@@ -55,7 +55,7 @@ export const NexaAiChatbot: React.FC<NexaAiChatbotProps> = ({ onInspectDocument 
   // Input & Controls State
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<'gemini' | 'groq' | 'nexa-hybrid'>('gemini');
+  const [selectedModel, setSelectedModel] = useState<'groq' | 'nexa-hybrid'>('groq');
   const [selectedMode, setSelectedMode] = useState<'deep-rag' | 'fast-qa' | 'legal-audit'>('deep-rag');
   const [selectedScope, setSelectedScope] = useState<string>('All Files');
   const [attachedFiles, setAttachedFiles] = useState<string[]>([]);
@@ -213,19 +213,6 @@ export const NexaAiChatbot: React.FC<NexaAiChatbotProps> = ({ onInspectDocument 
         <div className="flex flex-wrap items-center gap-2">
           {/* Model Selector */}
           <div className="flex items-center gap-1.5 p-1 rounded-full bg-white/5 border border-white/10 text-xs font-mono">
-            <button
-              onClick={() => {
-                playTactileClick();
-                setSelectedModel('gemini');
-              }}
-              className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
-                selectedModel === 'gemini'
-                  ? 'bg-[#7c3aed] text-white shadow-md'
-                  : 'text-[#94a3b8] hover:text-white'
-              }`}
-            >
-              Gemini 2.5 Flash
-            </button>
             <button
               onClick={() => {
                 playTactileClick();
