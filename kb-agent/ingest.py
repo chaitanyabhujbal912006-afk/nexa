@@ -16,7 +16,6 @@ from datetime import datetime
 
 import pandas as pd
 from pypdf import PdfReader
-import chromadb
 from sentence_transformers import SentenceTransformer
 
 EMBED_MODEL = "all-MiniLM-L6-v2"
@@ -497,6 +496,7 @@ def main(user_id: str = "usr_default"):
         _pinecone_upsert(all_docs, all_metas, all_ids, embeddings, user_id)
     else:
         print("Upserting to ChromaDB (local)...")
+        import chromadb
         client = chromadb.PersistentClient(path=DB_DIR)
         collection = client.get_or_create_collection(
             name="sme_knowledge_base",
