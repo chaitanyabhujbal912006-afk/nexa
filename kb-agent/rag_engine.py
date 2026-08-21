@@ -4,9 +4,18 @@ Multi-tenant user_id metadata filtering enabled for per-user data isolation.
 Vector store: Pinecone (if PINECONE_API_KEY set) with ChromaDB local fallback.
 """
 
-import os
-import re
-from datetime import datetime
+# ── Low Memory & Thread Optimizations for 512MB RAM environments (e.g. Render Free Tier) ──
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+try:
+    import torch
+    torch.set_num_threads(1)
+    torch.set_num_interop_threads(1)
+except Exception:
+    pass
 
 from sentence_transformers import SentenceTransformer
 from fpdf import FPDF
@@ -24,9 +33,15 @@ EMBED_MODEL = "all-MiniLM-L6-v2"
 _model_instance = None
 
 def get_model():
-    """Lazy load the sentence transformer model on demand."""
+    """Lazy load the sentence transformer model on demand in evaluation mode."""
     global _model_instance
     if _model_instance is None:
+        try:
+            import torch
+            torch.set_num_threads(1)
+            torch.set_num_interop_threads(1)
+        except Exception:
+            pass
         _model_instance = SentenceTransformer(EMBED_MODEL)
     return _model_instance
 
