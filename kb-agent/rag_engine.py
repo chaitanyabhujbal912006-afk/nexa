@@ -4,6 +4,10 @@ Multi-tenant user_id metadata filtering enabled for per-user data isolation.
 Vector store: Pinecone (if PINECONE_API_KEY set) with ChromaDB local fallback.
 """
 
+import os
+import re
+from datetime import datetime
+
 # ── Low Memory & Thread Optimizations for 512MB RAM environments (e.g. Render Free Tier) ──
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
