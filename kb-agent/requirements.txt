@@ -1,20 +1,18 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+sentence-transformers
+pinecone>=5.0.0
+resend
+fastapi>=0.111.0
+uvicorn>=0.29.0
 streamlit
-chromadb>=0.5.0
 pypdf
 openpyxl
 pandas
-sentence-transformers
 fpdf2
 requests
 httpx
-pytest
-pytest-asyncio
-anyio[trio]
-fastapi[standard]>=0.111.0
-uvicorn[standard]>=0.29.0
 python-multipart
 slowapi
 pyjwt
 passlib
-pinecone>=5.0.0
-resend

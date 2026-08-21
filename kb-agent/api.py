@@ -131,8 +131,7 @@ _ingest_lock = threading.Lock()
 # ─────────────────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("⚡ Nexa API v3.0 starting — initializing background model warmup...")
-    threading.Thread(target=get_model, daemon=True).start()
+    logger.info("⚡ Nexa API v3.0 starting — lazy model loading enabled for memory optimization.")
     yield
     logger.info("⚡ Nexa API shutting down.")
 
