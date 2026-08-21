@@ -12,11 +12,13 @@ GEMINI_MODEL = "gemini-2.0-flash"
 
 def load_secrets():
     """Try to load API keys from Streamlit secrets into env (no-op if not in Streamlit)."""
-    for key in ("GEMINI_API_KEY", "GROQ_API_KEY"):
+    for key in ("GEMINI_API_KEY", "GROQ_API_KEY", "PINECONE_API_KEY", "PINECONE_INDEX", "RESEND_API_KEY", "RESEND_FROM_EMAIL"):
         if key not in os.environ:
             try:
                 import streamlit as st
-                os.environ[key] = st.secrets[key]
+                val = st.secrets.get(key)
+                if val:
+                    os.environ[key] = val
             except Exception:
                 pass
 
