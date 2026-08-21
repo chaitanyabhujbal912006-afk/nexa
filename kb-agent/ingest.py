@@ -436,35 +436,21 @@ def ingest_csv(user_dir=None, user_id="usr_default"):
     return docs, metas, ids
 
 
-def _pinecone_upsert(all_docs, all_metas, all_ids, embeddings, user_id):
-    """Upsert vectors into Pinecone. Text is stored inside metadata['text']."""
-    from pinecone import Pinecone
-    pc = Pinecone(api_key=_PINECONE_API_KEY)
-    index = pc.Index(_PINECONE_INDEX)
-
-    # Delete existing vectors for this user (namespace-based isolation)
-    try:
-        index.delete(filter={"user_id": {"$eq": user_id}})
-    except Exception as e:
-        print(f"Warning: Could not delete old Pinecone vectors for {user_id}: {e}")
-
-    # Pinecone upsert in batches of 100
+def _pinecone_upsert_batch(batch_docs, batch_metas, batch_ids, embeddings, index):
+    """Upsert a single batch of vectors into Pinecone."""
     vectors = []
-    for vid, vec, meta, doc in zip(all_ids, embeddings, all_metas, all_docs):
+    for vid, vec, meta, doc in zip(batch_ids, embeddings, batch_metas, batch_docs):
         pinecone_meta = dict(meta)
         pinecone_meta["text"] = doc  # Store text in metadata for retrieval
         vectors.append({"id": vid, "values": vec, "metadata": pinecone_meta})
 
-    batch_size = 100
-    for i in range(0, len(vectors), batch_size):
-        batch = vectors[i: i + batch_size]
-        index.upsert(vectors=batch)
-        print(f"  Pinecone: upserted batch {i // batch_size + 1} ({len(batch)} vectors)")
+    index.upsert(vectors=vectors)
 
 
 def main(user_id: str = "usr_default"):
     print(f"Loading embedding model '{EMBED_MODEL}'...")
-    model = SentenceTransformer(EMBED_MODEL)
+    from rag_engine import get_model
+    model = get_model()
 
     if user_id == "usr_default":
         user_dir = DATA_DIR
@@ -488,12 +474,29 @@ def main(user_id: str = "usr_default"):
             "source_files": []
         }
 
-    print(f"Encoding {len(all_docs)} chunks with sentence-transformers...")
-    embeddings = model.encode(all_docs, show_progress_bar=True).tolist()
+    BATCH_SIZE = 32
+    print(f"Processing & encoding {len(all_docs)} total chunks in batches of {BATCH_SIZE}...")
 
     if _USE_PINECONE:
-        print("Upserting to Pinecone...")
-        _pinecone_upsert(all_docs, all_metas, all_ids, embeddings, user_id)
+        from pinecone import Pinecone
+        pc = Pinecone(api_key=_PINECONE_API_KEY)
+        index = pc.Index(_PINECONE_INDEX)
+        # Purge existing vectors for user before fresh batch ingestion
+        try:
+            index.delete(filter={"user_id": {"$eq": user_id}})
+        except Exception as e:
+            print(f"Warning: Could not delete old Pinecone vectors for {user_id}: {e}")
+
+        # Stream encode and upsert in batches of 32
+        for start_idx in range(0, len(all_docs), BATCH_SIZE):
+            end_idx = min(start_idx + BATCH_SIZE, len(all_docs))
+            b_docs = all_docs[start_idx:end_idx]
+            b_metas = all_metas[start_idx:end_idx]
+            b_ids = all_ids[start_idx:end_idx]
+
+            b_embeddings = model.encode(b_docs, batch_size=len(b_docs), show_progress_bar=False).tolist()
+            _pinecone_upsert_batch(b_docs, b_metas, b_ids, b_embeddings, index)
+            print(f"  Pinecone: processed batch {start_idx // BATCH_SIZE + 1} ({len(b_docs)} vectors)")
     else:
         print("Upserting to ChromaDB (local)...")
         import chromadb
@@ -502,14 +505,21 @@ def main(user_id: str = "usr_default"):
             name="sme_knowledge_base",
             metadata={"hnsw:space": "cosine"},
         )
-        # Clear existing chunks for this user for idempotent re-runs
         try:
             existing = collection.get(where={"user_id": user_id})["ids"]
             if existing:
                 collection.delete(ids=existing)
         except Exception:
             pass
-        collection.add(documents=all_docs, metadatas=all_metas, ids=all_ids, embeddings=embeddings)
+
+        for start_idx in range(0, len(all_docs), BATCH_SIZE):
+            end_idx = min(start_idx + BATCH_SIZE, len(all_docs))
+            b_docs = all_docs[start_idx:end_idx]
+            b_metas = all_metas[start_idx:end_idx]
+            b_ids = all_ids[start_idx:end_idx]
+
+            b_embeddings = model.encode(b_docs, batch_size=len(b_docs), show_progress_bar=False).tolist()
+            collection.add(documents=b_docs, metadatas=b_metas, ids=b_ids, embeddings=b_embeddings)
 
     summary = {
         "status": "success",
