@@ -24,6 +24,11 @@ EMBED_MODEL = "all-MiniLM-L6-v2"
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 DB_DIR = os.path.join(os.path.dirname(__file__), "chroma_db")
 
+# ── Backend detection ──────────────────────────────────────────────
+_PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY", "")
+_PINECONE_INDEX = os.environ.get("PINECONE_INDEX", "nexa-knowledge-base")
+_USE_PINECONE = bool(_PINECONE_API_KEY)
+
 import email
 import email.utils
 
@@ -432,15 +437,35 @@ def ingest_csv(user_dir=None, user_id="usr_default"):
     return docs, metas, ids
 
 
+def _pinecone_upsert(all_docs, all_metas, all_ids, embeddings, user_id):
+    """Upsert vectors into Pinecone. Text is stored inside metadata['text']."""
+    from pinecone import Pinecone
+    pc = Pinecone(api_key=_PINECONE_API_KEY)
+    index = pc.Index(_PINECONE_INDEX)
+
+    # Delete existing vectors for this user (namespace-based isolation)
+    try:
+        index.delete(filter={"user_id": {"$eq": user_id}})
+    except Exception as e:
+        print(f"Warning: Could not delete old Pinecone vectors for {user_id}: {e}")
+
+    # Pinecone upsert in batches of 100
+    vectors = []
+    for vid, vec, meta, doc in zip(all_ids, embeddings, all_metas, all_docs):
+        pinecone_meta = dict(meta)
+        pinecone_meta["text"] = doc  # Store text in metadata for retrieval
+        vectors.append({"id": vid, "values": vec, "metadata": pinecone_meta})
+
+    batch_size = 100
+    for i in range(0, len(vectors), batch_size):
+        batch = vectors[i: i + batch_size]
+        index.upsert(vectors=batch)
+        print(f"  Pinecone: upserted batch {i // batch_size + 1} ({len(batch)} vectors)")
+
+
 def main(user_id: str = "usr_default"):
     print(f"Loading embedding model '{EMBED_MODEL}'...")
     model = SentenceTransformer(EMBED_MODEL)
-
-    client = chromadb.PersistentClient(path=DB_DIR)
-    collection = client.get_or_create_collection(
-        name="sme_knowledge_base",
-        metadata={"hnsw:space": "cosine"},
-    )
 
     if user_id == "usr_default":
         user_dir = DATA_DIR
@@ -457,10 +482,6 @@ def main(user_id: str = "usr_default"):
 
     if not all_docs:
         print(f"No documents found to ingest for user {user_id}.")
-        # Purge any existing chunks for this user if they deleted all files
-        existing = collection.get(where={"user_id": user_id})["ids"]
-        if existing:
-            collection.delete(ids=existing)
         return {
             "status": "success",
             "total_chunks": 0,
@@ -471,13 +492,25 @@ def main(user_id: str = "usr_default"):
     print(f"Encoding {len(all_docs)} chunks with sentence-transformers...")
     embeddings = model.encode(all_docs, show_progress_bar=True).tolist()
 
-    # Clear existing chunks for this user for idempotent re-runs
-    existing = collection.get(where={"user_id": user_id})["ids"]
-    if existing:
-        collection.delete(ids=existing)
+    if _USE_PINECONE:
+        print("Upserting to Pinecone...")
+        _pinecone_upsert(all_docs, all_metas, all_ids, embeddings, user_id)
+    else:
+        print("Upserting to ChromaDB (local)...")
+        client = chromadb.PersistentClient(path=DB_DIR)
+        collection = client.get_or_create_collection(
+            name="sme_knowledge_base",
+            metadata={"hnsw:space": "cosine"},
+        )
+        # Clear existing chunks for this user for idempotent re-runs
+        try:
+            existing = collection.get(where={"user_id": user_id})["ids"]
+            if existing:
+                collection.delete(ids=existing)
+        except Exception:
+            pass
+        collection.add(documents=all_docs, metadatas=all_metas, ids=all_ids, embeddings=embeddings)
 
-    collection.add(documents=all_docs, metadatas=all_metas, ids=all_ids,
-                    embeddings=embeddings)
     summary = {
         "status": "success",
         "total_chunks": len(all_docs),
@@ -493,4 +526,3 @@ def main(user_id: str = "usr_default"):
 
 if __name__ == "__main__":
     main()
-

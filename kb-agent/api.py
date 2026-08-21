@@ -67,7 +67,10 @@ os.makedirs(DATA_DIR, exist_ok=True)
 # ── Environment & Secrets ────────────────────────────────────────────────────
 load_secrets()
 _NEXA_API_KEY = os.environ.get("NEXA_API_KEY", "")
+_RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+_RESEND_FROM = os.environ.get("RESEND_FROM_EMAIL", "Nexa <onboarding@resend.dev>")
 
+# JWT_SECRET: must come from env var in production — file fallback is for local dev only
 if "JWT_SECRET" in os.environ:
     JWT_SECRET = os.environ["JWT_SECRET"]
 else:
@@ -79,6 +82,10 @@ else:
         JWT_SECRET = secrets.token_urlsafe(32)
         with open(secret_file, "w") as f:
             f.write(JWT_SECRET)
+    logger.warning(
+        "JWT_SECRET loaded from local file. Set JWT_SECRET env var in production "
+        "or tokens will invalidate on every redeploy!"
+    )
 
 JWT_ALGORITHM = "HS256"
 
@@ -371,20 +378,52 @@ def _kb_file_stats() -> Dict[str, int]:
 # ─────────────────────────────────────────────────────────────────────────────
 @app.post("/api/v1/auth/otp", tags=["Auth"])
 def send_otp(req: OtpRequest):
-    """Send an Email OTP verification code to user's inbox."""
+    """Send an Email OTP verification code to user's inbox via Resend."""
     clean_email = req.email.strip().lower()
     if "@" not in clean_email:
         raise _problem(400, "INVALID_EMAIL", "Please enter a valid email address.")
-    
-    code = "123456"
+
+    import random
+    import string
+    code = "".join(random.choices(string.digits, k=6))
+
     store = _load_otp_store()
     store[clean_email] = {
         "code": code,
         "expires_at": time.time() + 600,  # 10 minutes TTL
     }
     _save_otp_store(store)
-    logger.info("Sent OTP code %s to %s", code, clean_email)
-    return {"status": "otp_sent", "email": clean_email, "message": "Verification code sent (use 123456 for demo)."}
+
+    if _RESEND_API_KEY:
+        try:
+            import resend
+            resend.api_key = _RESEND_API_KEY
+            resend.Emails.send({
+                "from": _RESEND_FROM,
+                "to": [clean_email],
+                "subject": "Your Nexa verification code",
+                "html": f"""
+                    <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;">
+                      <h2 style="color:#6366f1;margin-bottom:8px;">&#9889; Nexa Verification</h2>
+                      <p style="color:#64748b;font-size:14px;">Use the code below to sign in. It expires in <strong>10 minutes</strong>.</p>
+                      <div style="background:#f1f5f9;border-radius:12px;padding:24px;text-align:center;margin:24px 0;">
+                        <span style="font-family:monospace;font-size:2.5rem;font-weight:700;letter-spacing:.35em;color:#1e293b;">{code}</span>
+                      </div>
+                      <p style="color:#94a3b8;font-size:12px;">If you didn’t request this, ignore this email.</p>
+                    </div>
+                """,
+            })
+            logger.info("Sent real OTP email to %s via Resend", clean_email)
+            return {"status": "otp_sent", "email": clean_email, "message": "Verification code sent to your email."}
+        except Exception as e:
+            logger.error("Resend email failed for %s: %s", clean_email, e)
+            raise _problem(500, "EMAIL_SEND_FAILED",
+                           f"Failed to send verification email. Please check RESEND_API_KEY. Error: {e}")
+    else:
+        # No email service configured — fail loudly in production
+        logger.warning("RESEND_API_KEY not set. OTP will not be sent for %s", clean_email)
+        raise _problem(503, "EMAIL_NOT_CONFIGURED",
+                       "Email service is not configured. Please set RESEND_API_KEY environment variable.")
 
 
 @app.post("/api/v1/auth/verify", response_model=AuthResponse, tags=["Auth"])
@@ -442,20 +481,41 @@ def health_check():
 
 @app.get("/api/v1/stats", response_model=StatsResponse, tags=["System"])
 def get_stats(user: Dict[str, Any] = Depends(get_current_user)):
+    user_id = user["user_id"]
+    breakdown: Dict[str, int] = {}
+    sources: set = set()
+
     try:
-        import chromadb
-        client = chromadb.PersistentClient(path=os.path.join(BASE_DIR, "chroma_db"))
-        col = client.get_or_create_collection("sme_knowledge_base")
-        user_id = user["user_id"]
-        res = col.get(where={"user_id": user_id}, include=["metadatas"])
-        metas = res.get("metadatas") or []
-        breakdown: Dict[str, int] = {}
-        sources: set = set()
+        from rag_engine import _USE_PINECONE as _use_pinecone
+        if _use_pinecone:
+            from rag_engine import _pinecone_index, get_model
+            index = _pinecone_index()
+            model = get_model()
+            vec = model.encode(["document"]).tolist()
+            resp = index.query(
+                vector=vec[0], top_k=1000, include_metadata=True,
+                filter={"user_id": {"$eq": user_id}}
+            )
+            metas = [m.get("metadata", {}) for m in resp.get("matches", [])]
+        else:
+            import chromadb as _chromadb
+            client = _chromadb.PersistentClient(
+                path=os.path.join(BASE_DIR, "chroma_db")
+            )
+            col = client.get_or_create_collection("sme_knowledge_base")
+            # Safe get with fallback for old chunks that lack user_id field
+            try:
+                res = col.get(where={"user_id": user_id}, include=["metadatas"])
+            except Exception:
+                res = col.get(include=["metadatas"])
+            metas = res.get("metadatas") or []
+
         for m in metas:
             t = m.get("source_type", "unknown")
             breakdown[t] = breakdown.get(t, 0) + 1
             if m.get("source_name"):
                 sources.add(m["source_name"])
+
         return StatsResponse(
             total_documents=len(sources),
             total_chunks=len(metas),

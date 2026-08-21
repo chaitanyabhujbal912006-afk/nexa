@@ -1,18 +1,23 @@
 """
 Core RAG engine: retrieval + conflict detection + LLM generation + attribution + PDF Report Generator.
 Multi-tenant user_id metadata filtering enabled for per-user data isolation.
+Vector store: Pinecone (if PINECONE_API_KEY set) with ChromaDB local fallback.
 """
 
 import os
 import re
 from datetime import datetime
 
-import chromadb
 from sentence_transformers import SentenceTransformer
 from fpdf import FPDF
 
 BASE_DIR = os.path.dirname(__file__)
 DB_DIR = os.path.join(BASE_DIR, "chroma_db")
+
+# ── Vector Store Backend Detection ───────────────────────────────────────────
+_PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY", "")
+_PINECONE_INDEX = os.environ.get("PINECONE_INDEX", "nexa-knowledge-base")
+_USE_PINECONE = bool(_PINECONE_API_KEY)
 
 EMBED_MODEL = "all-MiniLM-L6-v2"
 
@@ -46,9 +51,11 @@ class RetrievalResult:
 
 
 def _load_collection():
+    """Returns ChromaDB collection (local fallback when Pinecone not configured)."""
+    import chromadb
     client = chromadb.PersistentClient(path=DB_DIR)
     collection = client.get_or_create_collection(name="sme_knowledge_base", metadata={"hnsw:space": "cosine"})
-    
+
     # Auto-ingest if collection is empty
     if collection.count() == 0:
         try:
@@ -57,8 +64,15 @@ def _load_collection():
             collection = client.get_or_create_collection(name="sme_knowledge_base", metadata={"hnsw:space": "cosine"})
         except Exception as e:
             print(f"Warning: Auto-ingest on startup failed: {e}")
-            
+
     return collection
+
+
+def _pinecone_index():
+    """Returns a connected Pinecone Index object."""
+    from pinecone import Pinecone
+    pc = Pinecone(api_key=_PINECONE_API_KEY)
+    return pc.Index(_PINECONE_INDEX)
 
 
 def delete_document_from_index(source_name: str, user_id: str = None) -> int:
@@ -128,18 +142,31 @@ def contextualize_query(query: str, history: list = None) -> str:
     return query
 
 
-def retrieve(query, top_k=5, fetch_k=12, max_distance=0.75, history=None, user_id: str = None):
-    """
-    Retrieves `fetch_k` nearest chunks, applies distance threshold filtering,
-    and supports optional user_id isolation filtering.
-    """
-    effective_query = contextualize_query(query, history) if history else query
+def _retrieve_pinecone(effective_query: str, query_vec: list, fetch_k: int, max_distance: float, user_id: str = None):
+    """Retrieve from Pinecone index."""
+    index = _pinecone_index()
+    filter_dict = {"user_id": {"$eq": user_id}} if user_id else None
+    resp = index.query(
+        vector=query_vec[0],
+        top_k=fetch_k,
+        include_metadata=True,
+        filter=filter_dict,
+    )
+    hits = []
+    for match in resp.get("matches", []):
+        score = match.get("score", 0.0)  # Pinecone returns cosine SIMILARITY (0–1), higher=better
+        distance = 1.0 - score  # convert to distance for compatibility
+        if distance <= max_distance:
+            meta = match.get("metadata", {})
+            text = meta.pop("text", "")
+            hits.append(RetrievalResult(text, meta, distance))
+    return hits
+
+
+def _retrieve_chromadb(effective_query: str, query_vec: list, fetch_k: int, max_distance: float, user_id: str = None):
+    """Retrieve from local ChromaDB."""
     collection = _load_collection()
-    model = get_model()
-    query_vec = model.encode([effective_query]).tolist()
-    
     where_filter = {"user_id": user_id} if user_id else None
-    
     try:
         results = collection.query(
             query_embeddings=query_vec,
@@ -147,7 +174,6 @@ def retrieve(query, top_k=5, fetch_k=12, max_distance=0.75, history=None, user_i
             where=where_filter
         )
     except Exception:
-        # Fallback if where filter fails (e.g. legacy chunks without user_id)
         results = collection.query(query_embeddings=query_vec, n_results=fetch_k)
 
     hits = []
@@ -157,19 +183,30 @@ def retrieve(query, top_k=5, fetch_k=12, max_distance=0.75, history=None, user_i
         ):
             if dist <= max_distance:
                 hits.append(RetrievalResult(doc, meta, dist))
+    return hits
 
+
+def retrieve(query, top_k=5, fetch_k=12, max_distance=0.75, history=None, user_id: str = None):
+    """
+    Retrieves `fetch_k` nearest chunks, applies distance threshold filtering.
+    Uses Pinecone if configured, ChromaDB otherwise.
+    """
+    effective_query = contextualize_query(query, history) if history else query
+    model = get_model()
+    query_vec = model.encode([effective_query]).tolist()
+
+    if _USE_PINECONE:
+        hits = _retrieve_pinecone(effective_query, query_vec, fetch_k, max_distance, user_id)
+    else:
+        hits = _retrieve_chromadb(effective_query, query_vec, fetch_k, max_distance, user_id)
+
+    # Retry with original query if contextualised query returned nothing
     if not hits and effective_query != query:
-        results = collection.query(
-            query_embeddings=query_vec,
-            n_results=fetch_k,
-            where=where_filter
-        )
-        if results and results.get("documents") and results["documents"][0]:
-            for doc, meta, dist in zip(
-                results["documents"][0], results["metadatas"][0], results["distances"][0]
-            ):
-                if dist <= max_distance:
-                    hits.append(RetrievalResult(doc, meta, dist))
+        orig_vec = model.encode([query]).tolist()
+        if _USE_PINECONE:
+            hits = _retrieve_pinecone(query, orig_vec, fetch_k, max_distance, user_id)
+        else:
+            hits = _retrieve_chromadb(query, orig_vec, fetch_k, max_distance, user_id)
 
     if not hits:
         return []
@@ -233,21 +270,33 @@ def detect_conflicts(hits):
 
 
 def scan_all_conflicts(user_id: str = None):
-    """Performs a full proactive audit of ChromaDB collection for conflicts."""
-    collection = _load_collection()
-    where_filter = {"user_id": user_id} if user_id else None
-    
-    try:
-        res = collection.get(where=where_filter)
-    except Exception:
-        res = collection.get()
-
-    if not res or not res.get("documents"):
-        return []
-
+    """Full proactive audit for conflicts. Works with Pinecone or ChromaDB."""
     all_hits = []
-    for doc, meta in zip(res["documents"], res["metadatas"]):
-        all_hits.append(RetrievalResult(doc, meta, distance=0.0))
+
+    if _USE_PINECONE:
+        # Fetch all vectors for user via dummy query — Pinecone doesn't have a "get all" API
+        # We use a zero-vector query with a high top_k as a workaround
+        model = get_model()
+        zero_vec = model.encode(["document policy terms refund payment warranty"]).tolist()
+        index = _pinecone_index()
+        filter_dict = {"user_id": {"$eq": user_id}} if user_id else None
+        resp = index.query(vector=zero_vec[0], top_k=1000, include_metadata=True, filter=filter_dict)
+        for match in resp.get("matches", []):
+            meta = dict(match.get("metadata", {}))
+            text = meta.pop("text", "")
+            all_hits.append(RetrievalResult(text, meta, distance=0.0))
+    else:
+        import chromadb
+        collection = _load_collection()
+        where_filter = {"user_id": user_id} if user_id else None
+        try:
+            res = collection.get(where=where_filter)
+        except Exception:
+            res = collection.get()
+
+        if res and res.get("documents"):
+            for doc, meta in zip(res["documents"], res["metadatas"]):
+                all_hits.append(RetrievalResult(doc, meta, distance=0.0))
 
     return detect_conflicts(all_hits)
 
@@ -312,26 +361,23 @@ def generate_answer(query, hits, conflicts, llm_call_fn=None):
     if llm_call_fn is not None:
         try:
             return llm_call_fn(SYSTEM_PROMPT, user_prompt), context_block
-        except Exception:
-            pass
+        except Exception as llm_err:
+            # LLM call failed — return honest error, not a fake answer
+            return (
+                f"⚠️ **AI model temporarily unavailable** ({type(llm_err).__name__}). "
+                f"I found {len(hits)} relevant source(s) in your knowledge base, but cannot generate "
+                f"a synthesized answer right now. Please try again in a moment, or check that your "
+                f"API key (GROQ_API_KEY / GEMINI_API_KEY) is correctly configured.",
+                context_block
+            )
 
-    if conflicts:
-        c = conflicts[0]
-        answer = (
-            f"⚠️ Conflict detected on **{c['topic']}**.\n\n"
-            f"- Older source: {c['outdated'][0].citation} says: "
-            f"\"{c['outdated'][0].text[:180]}...\"\n"
-            f"- Newer source: {c['trusted'].citation} says: "
-            f"\"{c['trusted'].text[:180]}...\"\n\n"
-            f"**Trusted answer** (most recent, dated {c['trusted'].date.date()}): "
-            f"{c['trusted'].text}\n\n"
-            f"Reasoning: the newer document explicitly states it supersedes prior terms."
-        )
-    elif hits:
-        answer = f"Based on [1] {hits[0].citation}: {hits[0].text}"
-    else:
-        answer = "I couldn't find anything in your knowledge base to answer that."
-    return answer, context_block
+    # No LLM configured at all
+    return (
+        "⚠️ **No AI model configured.** Please set `GROQ_API_KEY` or `GEMINI_API_KEY` in your "
+        "environment variables or Streamlit secrets to enable AI-generated answers. "
+        f"I found {len(hits)} matching source(s) in your knowledge base — configure an API key to get answers.",
+        context_block
+    )
 
 
 def _clean_unicode_for_pdf(text: str) -> str:
