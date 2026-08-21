@@ -961,8 +961,23 @@ with tab_analytics:
 
     st.divider()
 
-    # Recent Audit Log Table
+    # Export + Recent Audit Log Table
     st.markdown("### Recent Audit Trail")
+    if audit_entries:
+        # Download button
+        try:
+            from audit import export_audit_csv
+            csv_data = export_audit_csv()
+            st.download_button(
+                "📥 Export Full Audit Log (.csv)",
+                data=csv_data,
+                file_name=f"nexa_audit_{datetime.now():%Y%m%d_%H%M}.csv",
+                mime="text/csv",
+                use_container_width=False,
+            )
+        except Exception:
+            pass
+
     if audit_entries:
         for entry in reversed(audit_entries[-15:]):
             ts = str(entry.get("timestamp", ""))[:19].replace("T", " ")

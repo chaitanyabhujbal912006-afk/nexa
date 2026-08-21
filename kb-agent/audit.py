@@ -10,6 +10,8 @@ Features:
   - Structured JSON schema with schema_version for forward compatibility
 """
 
+import csv
+import io
 import json
 import logging
 import os
@@ -208,3 +210,84 @@ def read_recent_entries(n: int = 50, user_id: Optional[str] = None) -> List[dict
     except Exception as err:
         logger.error("Failed to read audit log: %s", err)
         return []
+
+
+def delete_entries_for_user(user_id: str) -> int:
+    """
+    GDPR-compliant purge: removes all audit entries for a given user_id.
+    Rewrites the log file in-place, preserving all other users' entries.
+
+    Args:
+        user_id: The user whose entries should be deleted.
+
+    Returns:
+        The number of entries deleted.
+    """
+    if not os.path.isfile(LOG_FILE):
+        return 0
+    deleted = 0
+    try:
+        with _write_lock:
+            with open(LOG_FILE, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            kept = []
+            for line in lines:
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                try:
+                    entry = json.loads(stripped)
+                    if entry.get("user_id", "usr_default") == user_id:
+                        deleted += 1
+                    else:
+                        kept.append(stripped)
+                except json.JSONDecodeError:
+                    kept.append(stripped)  # keep malformed lines untouched
+            with open(LOG_FILE, "w", encoding="utf-8") as f:
+                f.write("\n".join(kept))
+                if kept:
+                    f.write("\n")
+        logger.info("Deleted %d audit entries for user_id=%s", deleted, user_id)
+    except Exception as err:
+        logger.error("Failed to delete audit entries for user %s: %s", user_id, err)
+    return deleted
+
+
+def export_audit_csv(user_id: Optional[str] = None) -> str:
+    """
+    Export the full audit log as a CSV string (for download buttons in the UI).
+    Columns: timestamp, call_id, user_id, query, confidence_level, total_chunks,
+             provider, latency_ms, has_conflict, flagged.
+
+    Args:
+        user_id: If provided, only export entries for this user.
+
+    Returns:
+        A UTF-8 CSV string.
+    """
+    entries = read_recent_entries(n=10000, user_id=user_id)
+    output = io.StringIO()
+    writer = csv.DictWriter(
+        output,
+        fieldnames=[
+            "timestamp", "call_id", "user_id", "query",
+            "confidence_level", "total_chunks_retrieved",
+            "provider", "latency_ms", "has_conflict", "flagged",
+        ],
+        extrasaction="ignore",
+    )
+    writer.writeheader()
+    for entry in reversed(entries):  # chronological order for CSV
+        writer.writerow({
+            "timestamp": entry.get("timestamp", ""),
+            "call_id": entry.get("call_id", ""),
+            "user_id": entry.get("user_id", ""),
+            "query": entry.get("query", ""),
+            "confidence_level": entry.get("confidence_level", ""),
+            "total_chunks_retrieved": entry.get("total_chunks_retrieved", 0),
+            "provider": entry.get("provider", ""),
+            "latency_ms": entry.get("latency_ms", ""),
+            "has_conflict": bool(entry.get("conflicts_detected")),
+            "flagged": entry.get("flagged", False),
+        })
+    return output.getvalue()
