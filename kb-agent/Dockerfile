@@ -23,5 +23,5 @@ COPY . .
 # Expose ports: 8501 for Streamlit UI, 8000 for FastAPI REST
 EXPOSE 8501 8000
 
-# Default command starts Streamlit app
-CMD streamlit run app.py --server.port=${PORT:-8501} --server.address=0.0.0.0
+# Default command starts FastAPI REST server for Render deployment
+CMD uvicorn api:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1

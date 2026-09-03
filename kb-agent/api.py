@@ -472,6 +472,17 @@ def verify_otp(req: OtpVerifyRequest):
 # ─────────────────────────────────────────────────────────────────────────────
 # Core Knowledge & System Routes
 # ─────────────────────────────────────────────────────────────────────────────
+@app.get("/", tags=["System"])
+def root():
+    return {
+        "status": "online",
+        "name": "Nexa Intelligence Engine API",
+        "version": "3.0.0",
+        "docs": "/docs",
+        "health": "/api/v1/health",
+    }
+
+
 @app.get("/api/v1/health", response_model=HealthResponse, tags=["System"])
 def health_check():
     return HealthResponse(

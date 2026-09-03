@@ -11,6 +11,7 @@ openpyxl
 pandas
 fpdf2
 requests
+httpx
 python-multipart
 slowapi
 pyjwt
