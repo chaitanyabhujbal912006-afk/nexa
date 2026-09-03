@@ -106,8 +106,15 @@ def client():
             yield c
 
 
-# ── Health ──────────────────────────────────────────────────────────────────
+# ── Health & Root ────────────────────────────────────────────────────────────
 class TestHealth:
+    def test_root_200(self, client):
+        res = client.get("/")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["status"] == "online"
+        assert data["health"] == "/api/v1/health"
+
     def test_health_200(self, client):
         res = client.get("/api/v1/health")
         assert res.status_code == 200
