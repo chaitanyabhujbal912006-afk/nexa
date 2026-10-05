@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { FileDown, FileText, CheckCircle2, ShieldCheck, Calendar, Clock, Layers, Sparkles, Printer, RefreshCw } from 'lucide-react';
 import { CitationItem, ExecutiveReport } from '../types';
-import { playTactileClick, playResolvedChime } from '../utils/audio';
+import { generateReport } from '../api/knowledge';
+import { playTactileClick, playResolvedChime, playAlertWarble } from '../utils/audio';
 
 interface ExecutiveReportGeneratorProps {
   initialCitations?: CitationItem[];
@@ -70,24 +71,39 @@ export const ExecutiveReportGenerator: React.FC<ExecutiveReportGeneratorProps> =
     );
   };
 
-  const handleGeneratePdf = () => {
+  const handleGeneratePdf = async () => {
     playTactileClick();
     setIsGenerating(true);
 
-    setTimeout(() => {
-      setIsGenerating(false);
-      const newReport: ExecutiveReport = {
-        id: `rep-${Math.random().toString(36).substring(2, 6)}`,
-        title,
-        summaryText: summaryMarkdown,
-        generatedDate: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
-        author: 'Elena Rostova (Lead Architect)',
-        citations: availableCitations.filter((c) => selectedCitationIds.includes(c.id)),
-      };
+    const activeCitations = availableCitations.filter((c) => selectedCitationIds.includes(c.id));
+    const newReport: ExecutiveReport = {
+      id: `rep-${Math.random().toString(36).substring(2, 6)}`,
+      title,
+      summaryText: summaryMarkdown,
+      generatedDate: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
+      author: 'Elena Rostova (Lead Architect)',
+      citations: activeCitations,
+    };
+
+    try {
+      // Call real backend executive PDF endpoint
+      const blob = await generateReport(title, summaryMarkdown, activeCitations);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nexa_executive_report_${Date.now()}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
 
       setGeneratedReports((prev) => [newReport, ...prev]);
-
-      // Trigger HTML printable download
+      setDownloadSuccess(true);
+      playResolvedChime();
+      setTimeout(() => setDownloadSuccess(false), 3500);
+    } catch (err) {
+      console.warn('Backend PDF endpoint error, falling back to printable window:', err);
+      // Fallback to printable window if backend unavailable
       const printWindow = window.open('', '_blank');
       if (printWindow) {
         printWindow.document.write(`
@@ -106,7 +122,7 @@ export const ExecutiveReportGenerator: React.FC<ExecutiveReportGeneratorProps> =
             <body>
               <h1>${title}</h1>
               <div class="meta">GENERATED: ${newReport.generatedDate} | SYSTEM: NEXA Neural Intelligence Engine v3.0 | SOC 2 Type II Audited</div>
-              <div class="content">${summaryMarkdown.replace(/\n/g, '<br/>')}</div>
+              <div class="content">${summaryMarkdown.replace(/\\n/g, '<br/>')}</div>
               <h3>Verified Source Citations (${newReport.citations.length})</h3>
               ${newReport.citations
                 .map(
@@ -123,11 +139,13 @@ export const ExecutiveReportGenerator: React.FC<ExecutiveReportGeneratorProps> =
         `);
         printWindow.document.close();
       }
-
+      setGeneratedReports((prev) => [newReport, ...prev]);
       setDownloadSuccess(true);
       playResolvedChime();
-      setTimeout(() => setDownloadSuccess(false), 3000);
-    }, 1200);
+      setTimeout(() => setDownloadSuccess(false), 3500);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
