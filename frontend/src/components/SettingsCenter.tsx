@@ -7,6 +7,7 @@ import {
 import { SettingsSubTab, UserSession, RagEngineSettings, ApiKeyItem, SessionDevice } from '../types';
 import { DEFAULT_RAG_SETTINGS } from '../data/mockKnowledge';
 import { purgeAuditLogs } from '../api/audit';
+import { checkHealth } from '../api/knowledge';
 import { playTactileClick, playResolvedChime, playAlertWarble } from '../utils/audio';
 
 interface SettingsCenterProps {
@@ -41,7 +42,15 @@ export const SettingsCenter: React.FC<SettingsCenterProps> = ({
   const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [showGroqKey, setShowGroqKey] = useState(false);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
-  const [connectionTestResult, setConnectionTestResult] = useState<{ status: 'ok' | 'error'; latency: number } | null>(null);
+  const [connectionTestResult, setConnectionTestResult] = useState<{
+    status: 'ok' | 'error';
+    latency: number;
+    provider?: string;
+    embeddingModel?: string;
+    version?: string;
+    kbStats?: { pdfs: number; excel: number; csv: number; emails: number };
+    errorMessage?: string;
+  } | null>(null);
 
   // Submodule 3: RAG Engine State
   const [ragSettings, setRagSettings] = useState<RagEngineSettings>(DEFAULT_RAG_SETTINGS);
@@ -99,16 +108,35 @@ export const SettingsCenter: React.FC<SettingsCenterProps> = ({
     setTimeout(() => setSavedSuccess(false), 3000);
   };
 
-  const handleTestConnection = () => {
+  const handleTestConnection = async () => {
     playTactileClick();
     setIsTestingConnection(true);
     setConnectionTestResult(null);
 
-    setTimeout(() => {
-      setIsTestingConnection(false);
-      setConnectionTestResult({ status: 'ok', latency: Math.floor(Math.random() * 40) + 75 });
+    const t0 = performance.now();
+    try {
+      const data = await checkHealth();
+      const latency = Math.round(performance.now() - t0);
+      setConnectionTestResult({
+        status: 'ok',
+        latency,
+        provider: data.provider,
+        embeddingModel: data.embedding_model,
+        version: data.version,
+        kbStats: data.kb_stats,
+      });
       playResolvedChime();
-    }, 1200);
+    } catch (err: any) {
+      const latency = Math.round(performance.now() - t0);
+      setConnectionTestResult({
+        status: 'error',
+        latency,
+        errorMessage: err?.message || 'Could not connect to live backend cluster.',
+      });
+      playAlertWarble();
+    } finally {
+      setIsTestingConnection(false);
+    }
   };
 
   const handleCreateApiKey = () => {
@@ -401,13 +429,47 @@ export const SettingsCenter: React.FC<SettingsCenterProps> = ({
               </button>
             </div>
 
-            {connectionTestResult && (
-              <div className="p-3 rounded-2xl bg-[#22c55e]/20 border border-[#22c55e]/40 text-[#4ade80] font-mono text-xs flex items-center justify-between animate-in fade-in">
+            {connectionTestResult && connectionTestResult.status === 'ok' && (
+              <div className="p-4 rounded-2xl bg-[#22c55e]/15 border border-[#22c55e]/40 text-white font-mono text-xs space-y-2.5 animate-in fade-in">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-2 text-[#4ade80] font-bold">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span>Backend cluster operational (HTTP 200 OK)</span>
+                  </span>
+                  <strong className="text-[#38bdf8] font-bold">{connectionTestResult.latency}ms roundtrip</strong>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-white/10 text-[11px] text-[#cbd5e1]">
+                  <div>
+                    <span className="text-[#94a3b8] block text-[9px] uppercase font-bold">Active LLM</span>
+                    <strong className="text-[#c084fc] truncate block">{connectionTestResult.provider || 'GROQ · compound'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-[#94a3b8] block text-[9px] uppercase font-bold">Embeddings</span>
+                    <strong className="text-white block">{connectionTestResult.embeddingModel || 'all-MiniLM-L6-v2'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-[#94a3b8] block text-[9px] uppercase font-bold">Indexed Files</span>
+                    <strong className="text-[#4ade80] block">
+                      {connectionTestResult.kbStats
+                        ? `${connectionTestResult.kbStats.pdfs + connectionTestResult.kbStats.excel + connectionTestResult.kbStats.csv + connectionTestResult.kbStats.emails} docs`
+                        : 'Active'}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-[#94a3b8] block text-[9px] uppercase font-bold">Engine Version</span>
+                    <strong className="text-white block">{connectionTestResult.version || 'v3.0.0'}</strong>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {connectionTestResult && connectionTestResult.status === 'error' && (
+              <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-200 font-mono text-xs flex items-center justify-between animate-in fade-in">
                 <span className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Backend cluster responded successfully (Status 200 OK)</span>
+                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>{connectionTestResult.errorMessage}</span>
                 </span>
-                <strong className="text-white">{connectionTestResult.latency}ms roundtrip</strong>
+                <strong className="text-amber-400">{connectionTestResult.latency}ms</strong>
               </div>
             )}
 

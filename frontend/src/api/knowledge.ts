@@ -224,12 +224,25 @@ export async function scanConflicts(): Promise<ConflictRecord[]> {
   return mapConflicts(resp.conflicts);
 }
 
+export interface HealthStatusResponse {
+  status: string;
+  version: string;
+  provider: string;
+  embedding_model: string;
+  kb_stats: {
+    pdfs: number;
+    excel: number;
+    csv: number;
+    emails: number;
+  };
+}
+
 /**
  * GET /api/v1/health
- * System health check — used to verify backend connectivity.
+ * System health check — used to verify backend connectivity and live configuration.
  */
-export async function checkHealth(): Promise<{ status: string; provider: string; version: string }> {
-  return apiFetch('/api/v1/health');
+export async function checkHealth(): Promise<HealthStatusResponse> {
+  return apiFetch<HealthStatusResponse>('/api/v1/health');
 }
 
 /**
