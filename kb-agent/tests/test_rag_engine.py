@@ -109,3 +109,32 @@ def test_generate_answer_llm_success_returns_llm_output():
     answer, ctx = generate_answer("What is the refund policy?", hits=[hit], conflicts=[], llm_call_fn=mock_llm)
     assert answer == "The refund window is 30 days per [1]."
     assert "RETRIEVED SOURCES:" in ctx
+
+
+def test_llm_dual_provider_groq_failover_to_gemini(monkeypatch):
+    from llm_config import call_llm
+    monkeypatch.setenv("GROQ_API_KEY", "mock_groq")
+    monkeypatch.setenv("GEMINI_API_KEY", "mock_gemini")
+
+    def mock_groq_fail(sys_p, usr_p):
+        raise RuntimeError("Groq 429 Too Many Requests")
+
+    def mock_gemini_ok(sys_p, usr_p):
+        return "Gemini failover response"
+
+    monkeypatch.setattr("llm_config._call_groq", mock_groq_fail)
+    monkeypatch.setattr("llm_config._call_gemini", mock_gemini_ok)
+
+    res = call_llm("sys", "usr")
+    assert res == "Gemini failover response"
+
+
+def test_llm_gemini_direct_when_no_groq(monkeypatch):
+    from llm_config import call_llm, get_active_provider
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.setenv("GEMINI_API_KEY", "mock_gemini")
+    monkeypatch.setattr("llm_config._call_gemini", lambda s, u: "Gemini direct response")
+
+    assert "GEMINI" in get_active_provider()
+    res = call_llm("sys", "usr")
+    assert res == "Gemini direct response"

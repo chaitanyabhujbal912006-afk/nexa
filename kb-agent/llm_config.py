@@ -4,7 +4,10 @@ Imported by both app.py (Streamlit) and api.py (FastAPI).
 No Streamlit dependency here.
 """
 
+import logging
 import os
+
+logger = logging.getLogger("nexa.llm")
 
 # Primary Groq model — updated 2026-08 (llama-3.3-70b-versatile retired from this account)
 GROQ_MODEL = "compound"          # Groq's own high-quality chat model
@@ -67,18 +70,44 @@ def _call_groq(system_prompt: str, user_prompt: str) -> str:
 
 
 def call_llm(system_prompt: str, user_prompt: str) -> str:
-    if os.environ.get("GROQ_API_KEY"):
-        return _call_groq(system_prompt, user_prompt)
-    raise RuntimeError("GROQ_API_KEY is not configured.")
+    """
+    Intelligent dual-provider dispatcher:
+    1. If GROQ_API_KEY configured, attempt Groq first.
+    2. If Groq fails (rate limit, model unavailable) and GEMINI_API_KEY is available, fail over to Gemini.
+    3. If only GEMINI_API_KEY is configured, call Gemini directly.
+    """
+    groq_key = os.environ.get("GROQ_API_KEY")
+    gemini_key = os.environ.get("GEMINI_API_KEY")
+
+    if groq_key:
+        try:
+            return _call_groq(system_prompt, user_prompt)
+        except Exception as groq_err:
+            if gemini_key:
+                logger.warning("Groq call encountered error (%s). Seamlessly failing over to Gemini...", groq_err)
+                return _call_gemini(system_prompt, user_prompt)
+            raise
+
+    if gemini_key:
+        return _call_gemini(system_prompt, user_prompt)
+
+    raise RuntimeError("Neither GROQ_API_KEY nor GEMINI_API_KEY is configured.")
 
 
 def get_active_provider() -> str:
-    if os.environ.get("GROQ_API_KEY"):
+    has_groq = bool(os.environ.get("GROQ_API_KEY"))
+    has_gemini = bool(os.environ.get("GEMINI_API_KEY"))
+
+    if has_groq and has_gemini:
+        return f"GROQ · {GROQ_MODEL} (Gemini failover)"
+    if has_groq:
         return f"GROQ · {GROQ_MODEL}"
-    return "DEMO MODE (no GROQ_API_KEY set)"
+    if has_gemini:
+        return f"GEMINI · {GEMINI_MODEL}"
+    return "DEMO MODE (no API key set)"
 
 
 def get_llm_fn():
-    if os.environ.get("GROQ_API_KEY"):
+    if os.environ.get("GROQ_API_KEY") or os.environ.get("GEMINI_API_KEY"):
         return call_llm
     return None
