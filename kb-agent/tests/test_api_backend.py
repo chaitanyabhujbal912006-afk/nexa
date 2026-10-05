@@ -259,3 +259,17 @@ class TestAudit:
         assert res.status_code == 200
         data = res.json()
         assert "entries" in data
+
+    def test_audit_csv_export(self, client):
+        res = client.get("/api/v1/audit/export")
+        assert res.status_code == 200
+        assert "text/csv" in res.headers.get("content-type", "")
+        assert "timestamp" in res.text
+
+    def test_audit_purge_user_data(self, client):
+        res = client.delete("/api/v1/audit/purge")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["status"] == "purged"
+        assert "records_deleted" in data
+        assert "purged_at" in data

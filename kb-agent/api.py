@@ -30,11 +30,12 @@ import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import jwt
 import ingest as ingest_module
-from audit import log_qa_event, read_recent_entries
+from audit import log_qa_event, read_recent_entries, export_audit_csv, delete_entries_for_user
 from llm_config import get_active_provider, get_llm_fn, load_secrets
 from rag_engine import (
     delete_document_from_index,
@@ -741,6 +742,38 @@ def get_audit_log(n: int = 50, user: Dict[str, Any] = Depends(get_current_user))
         "total_returned": len(entries),
         "entries": entries,
     }
+
+
+@app.get("/api/v1/audit/export", tags=["System"])
+def export_audit_log_csv(user: Dict[str, Any] = Depends(get_current_user)):
+    """Export the user's audit log as a downloadable CSV stream."""
+    try:
+        csv_content = export_audit_csv(user_id=user["user_id"])
+        filename = f"nexa_audit_{user['user_id']}.csv"
+        return Response(
+            content=csv_content,
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except Exception as exc:
+        logger.exception("Audit CSV export error: %s", exc)
+        raise _problem(500, "EXPORT_FAILED", "Failed to export audit log CSV.")
+
+
+@app.delete("/api/v1/audit/purge", tags=["System"])
+def purge_user_audit(user: Dict[str, Any] = Depends(get_current_user)):
+    """GDPR Right-to-be-Forgotten: purge all audit records for the authenticated user."""
+    try:
+        deleted = delete_entries_for_user(user["user_id"])
+        return {
+            "status": "purged",
+            "user_id": user["user_id"],
+            "records_deleted": deleted,
+            "purged_at": datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as exc:
+        logger.exception("Audit purge error: %s", exc)
+        raise _problem(500, "PURGE_FAILED", "Failed to purge audit records.")
 
 
 if __name__ == "__main__":
