@@ -138,3 +138,18 @@ def test_llm_gemini_direct_when_no_groq(monkeypatch):
     assert "GEMINI" in get_active_provider()
     res = call_llm("sys", "usr")
     assert res == "Gemini direct response"
+
+
+def test_detect_qualitative_clause_conflict():
+    older = _make_hit(
+        "All contractual disputes must be resolved through court litigation.",
+        source_name="terms_2023.pdf", topic="dispute_resolution", doc_date="2023-01-01"
+    )
+    newer = _make_hit(
+        "All contractual disputes must be resolved through binding arbitration.",
+        source_name="terms_2025.pdf", topic="dispute_resolution", doc_date="2025-01-01"
+    )
+    conflicts = detect_conflicts([newer, older])
+    assert len(conflicts) == 1
+    assert conflicts[0]["topic"] == "dispute_resolution"
+    assert conflicts[0]["trusted"].metadata["source_name"] == "terms_2025.pdf"

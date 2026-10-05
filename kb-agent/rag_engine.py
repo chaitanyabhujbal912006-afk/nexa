@@ -258,13 +258,26 @@ def detect_conflicts(hits):
             "all sales final", "store credit", "full refund", "no refund",
             "restocking fee", "discontinued", "supersedes", "early payment discount",
             "late fee", "late payment fee", "waived", "pre-approved",
-            "returns accepted", "no returns", "bill due", "invoice due", "amount due"
+            "returns accepted", "no returns", "bill due", "invoice due", "amount due",
+            "binding arbitration", "court litigation", "jury trial",
+            "exclusive", "non-exclusive", "transferable", "non-transferable",
+            "auto-renewal", "manual renewal", "uncapped liability", "limited liability"
         ]
         for sig in qualitative_signals:
             if sig in low:
-                facts.add(sig.replace(" ", ""))
+                facts.add(sig.replace(" ", "").replace("-", ""))
 
         return facts
+
+    POLARITY_CONTRADICTIONS = [
+        ({"nonrefundable", "norefund", "allsalesfinal", "noreturns"}, {"refundable", "fullrefund", "returnsaccepted"}),
+        ({"nofee", "waived"}, {"restockingfee", "latefee", "latepaymentfee"}),
+        ({"bindingarbitration", "arbitration"}, {"courtlitigation", "jurytrial"}),
+        ({"exclusive"}, {"nonexclusive"}),
+        ({"transferable"}, {"nontransferable"}),
+        ({"autorenewal"}, {"manualrenewal"}),
+        ({"uncappedliability"}, {"limitedliability"}),
+    ]
 
     conflicts = []
     for topic, group in by_topic.items():
@@ -278,8 +291,23 @@ def detect_conflicts(hits):
         if not outdated:
             continue
         trusted_facts = key_facts(trusted.text)
-        if all(key_facts(o.text) == trusted_facts for o in outdated):
+
+        has_conflict = False
+        for o in outdated:
+            o_facts = key_facts(o.text)
+            if o_facts != trusted_facts:
+                has_conflict = True
+                break
+            for side_a, side_b in POLARITY_CONTRADICTIONS:
+                if (trusted_facts & side_a and o_facts & side_b) or (trusted_facts & side_b and o_facts & side_a):
+                    has_conflict = True
+                    break
+            if has_conflict:
+                break
+
+        if not has_conflict:
             continue
+
         conflicts.append({
             "topic": topic,
             "trusted": trusted,
