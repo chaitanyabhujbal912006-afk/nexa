@@ -48,7 +48,10 @@ Base URL: `http://localhost:8000`
 | `GET` | `/api/v1/documents` | ✅ | List all indexed docs with type, size, chunk count |
 | `DELETE` | `/api/v1/documents/{name}` | ✅ | Remove doc from disk + purge vector embeddings |
 | `GET` | `/api/v1/conflicts` | ✅ | Proactive full-corpus policy conflict scan |
+| `POST` | `/api/v1/reports/pdf` | ✅ | Generate & download Executive PDF Report |
 | `GET` | `/api/v1/audit` | ✅ | Read recent audit log entries (newest-first, max 200) |
+| `GET` | `/api/v1/audit/export` | ✅ | Export user audit trail as CSV stream |
+| `DELETE` | `/api/v1/audit/purge` | ✅ | GDPR Right-to-Erasure compliance purge |
 | `GET` | `/docs` | ❌ | Interactive OpenAPI Swagger UI |
 | `GET` | `/redoc` | ❌ | ReDoc API reference |
 

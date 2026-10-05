@@ -10,7 +10,7 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.111+-009688?style=for-the-badge&logo=fastapi)
 ![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector%20Search-ff6600?style=for-the-badge)
 ![LLM](https://img.shields.io/badge/LLM-Gemini%202.0%20%7C%20Groq-ec4899?style=for-the-badge)
-![Tests](https://img.shields.io/badge/Tests-49%20Passed-34d399?style=for-the-badge)
+![Tests](https://img.shields.io/badge/Tests-63%20Passed-34d399?style=for-the-badge)
 
 ---
 
@@ -251,6 +251,15 @@ Uploads a document and queues asynchronous background vector ingestion.
 }
 ```
 
+### `POST /api/v1/reports/pdf`
+Generates and downloads a signed Executive PDF Report with verified citations and contradiction matrices.
+
+### `GET /api/v1/audit/export`
+Exports the user's full immutable audit trail as a RFC 4180 compliant CSV stream.
+
+### `DELETE /api/v1/audit/purge`
+Executes GDPR Right-to-Erasure compliance purge across all user audit events.
+
 ---
 
 ## 🧪 Testing & CI/CD Pipeline
@@ -263,12 +272,12 @@ pytest -v
 ```
 
 ```text
-tests/test_api_backend.py ...............                                [ 30%]
+tests/test_api_backend.py ....................                           [ 32%]
 tests/test_ingest_dates.py .....                                         [ 40%]
-tests/test_rag_engine.py .....                                           [ 51%]
+tests/test_rag_engine.py ..............                                  [ 62%]
 tests/test_real_world_cases.py ........................                  [100%]
 
-======================== 49 passed, 1 warning in 1.69s ========================
+======================== 63 passed, 1 warning in 16.35s ========================
 ```
 
 GitHub Actions CI automatically executes the test suite on every `git push` to `main`.

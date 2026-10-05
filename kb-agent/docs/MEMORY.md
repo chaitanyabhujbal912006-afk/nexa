@@ -8,6 +8,18 @@ Intended audience: a human teammate, or an agentic coding tool (e.g.
 Google Antigravity) reading this as project knowledge-base context before
 making changes.
 
+## 2026-10-05 — v3.1 Enterprise Upgrade: Dual LLM Failover, Qualitative Conflict Arbitration, Live PDF & GDPR Ledger
+
+**What exists:**
+- **Audit CSV Export & GDPR Purge**: Added REST endpoints `GET /api/v1/audit/export` (streamed CSV compliance ledger) and `DELETE /api/v1/audit/purge` (GDPR Right-to-Erasure log purge), complete with end-to-end backend tests.
+- **Intelligent Dual-Provider LLM Dispatcher (`llm_config.py`)**: Seamless automatic failover from Groq (`compound` / `qwen3.6-27b`) to Google Gemini (`gemini-2.0-flash`) upon 429 rate-limiting or service disruption; standalone Gemini mode support; dynamic provider reporting.
+- **Qualitative Clause Contradiction Matching (`rag_engine.py`)**: Closed the qualitative conflict gap — arbitration engine now detects mutually exclusive legal and policy clauses (e.g. binding arbitration vs court litigation, exclusive vs non-exclusive licensing, auto-renewal vs manual expiration, liability caps) in addition to numeric/date conflicts.
+- **Executive PDF Studio Backend Integration**: Frontend `ExecutiveReportGenerator` directly communicates with backend `/api/v1/reports/pdf` binary generation service, providing authentic cryptographic signatures and citations, with graceful fallback to browser print view.
+- **Audit Ledger CSV & GDPR Purge UI**: Integrated direct CSV download and confirmation-gated GDPR audit purge modal in `AuditLedgerView` and `SettingsCenter`.
+- **Live Connection Diagnostics & Benchmark**: `SettingsCenter` tests real HTTP roundtrip latency against `/api/v1/health` and displays live LLM provider, embedding model, and indexed file statistics.
+
+---
+
 ## 2026-07-30 — Production Hardening, UI Redesign & Enterprise API Expansion
 
 **What exists:**
