@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { History, Search, Filter, Download, FileText, CheckCircle2, AlertTriangle, ChevronRight, X, Copy, Code2, ShieldCheck, Clock, Terminal } from 'lucide-react';
+import { History, Search, Filter, Download, FileText, CheckCircle2, AlertTriangle, ChevronRight, X, Copy, Code2, ShieldCheck, Clock, Terminal, Trash2 } from 'lucide-react';
 import { AuditLedgerEntry } from '../types';
-import { fetchAuditLog } from '../api/audit';
-import { playTactileClick, playResolvedChime } from '../utils/audio';
+import { fetchAuditLog, downloadAuditCsv, purgeAuditLogs } from '../api/audit';
+import { playTactileClick, playResolvedChime, playAlertWarble } from '../utils/audio';
 
 export const AuditLedgerView: React.FC = () => {
   const [logs, setLogs] = useState<AuditLedgerEntry[]>([]);
@@ -13,7 +13,9 @@ export const AuditLedgerView: React.FC = () => {
   const [selectedProvider, setSelectedProvider] = useState<string>('All');
   const [selectedEntry, setSelectedEntry] = useState<AuditLedgerEntry | null>(null);
   const [copiedJson, setCopiedJson] = useState(false);
-  const [exportSuccess, setExportSuccess] = useState(false);
+  const [exportSuccessMessage, setExportSuccessMessage] = useState('');
+  const [showPurgeModal, setShowPurgeModal] = useState(false);
+  const [isPurging, setIsPurging] = useState(false);
 
   // Load real audit log from backend on mount
   useEffect(() => {
@@ -32,7 +34,6 @@ export const AuditLedgerView: React.FC = () => {
     };
     loadLogs();
   }, []);
-
 
   // Filter logic
   const filteredLogs = logs.filter((log) => {
@@ -63,9 +64,76 @@ export const AuditLedgerView: React.FC = () => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    setExportSuccess(true);
+    setExportSuccessMessage('Audit stream bundle exported successfully to nexa_audit_ledger.jsonl');
     playResolvedChime();
-    setTimeout(() => setExportSuccess(false), 2500);
+    setTimeout(() => setExportSuccessMessage(''), 3000);
+  };
+
+  const handleExportCsv = async () => {
+    playTactileClick();
+    try {
+      const blob = await downloadAuditCsv();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nexa_audit_report_${Date.now()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setExportSuccessMessage('Official compliance audit CSV generated and downloaded successfully.');
+      playResolvedChime();
+      setTimeout(() => setExportSuccessMessage(''), 3000);
+    } catch (err) {
+      console.warn('Backend CSV export failed, generating from client state:', err);
+      // Fallback CSV from client state
+      const headers = ['call_id', 'timestamp', 'query', 'answer', 'confidence_level', 'provider', 'latency_ms', 'chunks', 'conflicts'];
+      const rows = filteredLogs.map(l => [
+        `"${l.call_id}"`,
+        `"${l.timestamp}"`,
+        `"${l.query.replace(/"/g, '""')}"`,
+        `"${l.answer.replace(/"/g, '""')}"`,
+        `"${l.confidence_level}"`,
+        `"${l.provider}"`,
+        l.latency_ms,
+        l.chunks_retrieved_count,
+        l.conflicts_detected_count
+      ]);
+      const csvStr = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const blob = new Blob([csvStr], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nexa_audit_report_${Date.now()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setExportSuccessMessage('Audit CSV generated from client session.');
+      playResolvedChime();
+      setTimeout(() => setExportSuccessMessage(''), 3000);
+    }
+  };
+
+  const handleConfirmPurge = async () => {
+    playTactileClick();
+    setIsPurging(true);
+    try {
+      await purgeAuditLogs();
+      setLogs([]);
+      setSelectedEntry(null);
+      setShowPurgeModal(false);
+      setExportSuccessMessage('GDPR Right-to-Erasure completed: All audit records purged.');
+      playResolvedChime();
+      setTimeout(() => setExportSuccessMessage(''), 3500);
+    } catch (err) {
+      playAlertWarble();
+      setLoadError('Failed to purge audit records from backend.');
+    } finally {
+      setIsPurging(false);
+    }
   };
 
   const handleCopyPayload = () => {
@@ -110,19 +178,73 @@ export const AuditLedgerView: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={handleExportJsonl}
-          className="btn-orbitsat-purple px-5 py-2.5 rounded-full font-sans text-xs font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer shadow-lg"
-        >
-          <Download className="w-3.5 h-3.5" />
-          <span>Export Raw Log (JSONL)</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={handleExportCsv}
+            className="px-4 py-2 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 font-sans text-xs font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer transition-all shadow-md text-[#38bdf8]"
+            title="Download formatted CSV report for audit compliance"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Export CSV</span>
+          </button>
+
+          <button
+            onClick={handleExportJsonl}
+            className="btn-orbitsat-purple px-4 py-2 rounded-full font-sans text-xs font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer shadow-lg"
+            title="Download full JSON Lines raw event stream"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Export JSONL</span>
+          </button>
+
+          <button
+            onClick={() => {
+              playTactileClick();
+              setShowPurgeModal(true);
+            }}
+            className="p-2 rounded-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 transition-all cursor-pointer"
+            title="Purge audit logs (GDPR Right-to-Erasure)"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
-      {exportSuccess && (
+      {exportSuccessMessage && (
         <div className="p-3 rounded-2xl bg-[#22c55e]/20 border border-[#22c55e]/40 text-[#4ade80] font-mono text-xs flex items-center gap-2 animate-in fade-in">
-          <CheckCircle2 className="w-4 h-4" />
-          <span>Audit stream bundle exported successfully to nexa_audit_ledger.jsonl</span>
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          <span>{exportSuccessMessage}</span>
+        </div>
+      )}
+
+      {/* GDPR Purge Confirmation Modal */}
+      {showPurgeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="apple-glass-card rounded-[28px] max-w-md w-full p-6 border border-red-500/30 shadow-2xl space-y-4 text-white">
+            <div className="flex items-center gap-2 text-red-400">
+              <AlertTriangle className="w-5 h-5 shrink-0" />
+              <h3 className="font-display font-bold text-base">Purge Audit Ledger (GDPR)</h3>
+            </div>
+            <p className="font-sans text-xs text-[#cbd5e1] leading-relaxed">
+              Are you sure you want to permanently erase all query traces and compliance logs for your account?
+              This action cannot be undone and will reset your audit history.
+            </p>
+            <div className="flex justify-end gap-2.5 pt-2">
+              <button
+                onClick={() => setShowPurgeModal(false)}
+                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white font-sans text-xs cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={isPurging}
+                onClick={handleConfirmPurge}
+                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-sans text-xs font-bold cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {isPurging ? 'Purging...' : 'Confirm Purge'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

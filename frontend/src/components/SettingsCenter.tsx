@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 import { SettingsSubTab, UserSession, RagEngineSettings, ApiKeyItem, SessionDevice } from '../types';
 import { DEFAULT_RAG_SETTINGS } from '../data/mockKnowledge';
-import { playTactileClick, playResolvedChime } from '../utils/audio';
+import { purgeAuditLogs } from '../api/audit';
+import { playTactileClick, playResolvedChime, playAlertWarble } from '../utils/audio';
 
 interface SettingsCenterProps {
   userSession: UserSession;
@@ -348,8 +349,21 @@ export const SettingsCenter: React.FC<SettingsCenterProps> = ({
                   <div className="flex gap-2">
                     <button
                       disabled={deleteConfirmText !== 'DELETE'}
-                      onClick={() => alert('Account purge initiated in compliance with GDPR right-to-be-forgotten standard.')}
-                      className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-bold disabled:opacity-40 cursor-pointer"
+                      onClick={async () => {
+                        playTactileClick();
+                        try {
+                          await purgeAuditLogs();
+                          playResolvedChime();
+                          setShowDeleteDialog(false);
+                          setDeleteConfirmText('');
+                          setSavedSuccess(true);
+                          setTimeout(() => setSavedSuccess(false), 3000);
+                        } catch (err) {
+                          playAlertWarble();
+                          console.error('Account purge failed:', err);
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold disabled:opacity-40 cursor-pointer"
                     >
                       Confirm Permanent Deletion
                     </button>

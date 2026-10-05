@@ -200,15 +200,15 @@ export async function apiUpload<T>(path: string, formData: FormData): Promise<T>
   return response.json() as Promise<T>;
 }
 
-/** Download a binary response as a Blob (used for PDF report). */
-export async function apiDownload(path: string, body: unknown): Promise<Blob> {
+/** Download a binary response as a Blob (used for PDF report and CSV audit export). */
+export async function apiDownload(path: string, body?: unknown): Promise<Blob> {
   let response: Response;
   const fullUrl = `${BASE_URL}${path.startsWith('/') ? path : '/' + path}`;
   try {
     response = await fetchWithRetry(fullUrl, {
-      method: 'POST',
+      method: body !== undefined ? 'POST' : 'GET',
       headers: buildHeaders(),
-      body: JSON.stringify(body),
+      body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
     throw { status: 0, code: 'NETWORK_ERROR', message: 'Cannot reach the backend server. Is it running?' } as ApiError;

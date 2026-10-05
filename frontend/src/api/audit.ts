@@ -3,7 +3,7 @@
  * Audit Ledger service — fetches real JSONL log entries from the backend.
  */
 
-import { apiFetch } from './client';
+import { apiFetch, apiDownload } from './client';
 import { AuditLedgerEntry } from '../types';
 
 interface BackendAuditEntry {
@@ -21,6 +21,13 @@ interface BackendAuditEntry {
 interface BackendAuditResponse {
   total_returned: number;
   entries: BackendAuditEntry[];
+}
+
+export interface PurgeAuditResponse {
+  status: string;
+  user_id: string;
+  records_deleted: number;
+  purged_at: string;
 }
 
 function mapAuditEntry(e: BackendAuditEntry): AuditLedgerEntry {
@@ -44,4 +51,22 @@ function mapAuditEntry(e: BackendAuditEntry): AuditLedgerEntry {
 export async function fetchAuditLog(n: number = 100): Promise<AuditLedgerEntry[]> {
   const resp = await apiFetch<BackendAuditResponse>(`/api/v1/audit?n=${n}`);
   return resp.entries.map(mapAuditEntry);
+}
+
+/**
+ * GET /api/v1/audit/export
+ * Downloads the full user audit log as a CSV Blob.
+ */
+export async function downloadAuditCsv(): Promise<Blob> {
+  return apiDownload('/api/v1/audit/export');
+}
+
+/**
+ * DELETE /api/v1/audit/purge
+ * GDPR right-to-erasure: purges all audit entries for the current user.
+ */
+export async function purgeAuditLogs(): Promise<PurgeAuditResponse> {
+  return apiFetch<PurgeAuditResponse>('/api/v1/audit/purge', {
+    method: 'DELETE',
+  });
 }
